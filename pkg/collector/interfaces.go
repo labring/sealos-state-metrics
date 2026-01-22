@@ -55,6 +55,10 @@ type Collector interface {
 
 	// Health performs a health check on the collector
 	Health() error
+
+	// WaitReady blocks until the collector is ready to collect metrics
+	// Returns immediately if already ready, or if context is cancelled
+	WaitReady(ctx context.Context) error
 }
 
 // InformerCollector extends Collector for informer-based collectors

@@ -109,6 +109,8 @@ func (c *Collector) Start(ctx context.Context) error {
 
 	c.logger.Info("ImagePull collector started successfully")
 
+	c.SetReady(true)
+
 	return nil
 }
 

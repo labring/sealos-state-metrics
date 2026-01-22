@@ -1,8 +1,6 @@
 package node
 
 import (
-	"errors"
-
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
@@ -25,10 +23,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	if err := factoryCtx.ConfigLoader.LoadModuleConfig("collectors.node", cfg); err != nil {
 		factoryCtx.Logger.WithError(err).
 			Debug("Failed to load node collector config, using defaults")
-	}
-
-	if !cfg.Enabled {
-		return nil, errors.New("node collector is not enabled")
 	}
 
 	c := &Collector{

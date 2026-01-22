@@ -6,7 +6,6 @@ import (
 
 // Config contains configuration for the Domain collector
 type Config struct {
-	Enabled          bool          `yaml:"enabled"          env:"ENABLED"`
 	Domains          []string      `yaml:"domains"          env:"DOMAINS"            envSeparator:","`
 	CheckTimeout     time.Duration `yaml:"checkTimeout"     env:"CHECK_TIMEOUT"`
 	CheckInterval    time.Duration `yaml:"checkInterval"    env:"CHECK_INTERVAL"`
@@ -18,7 +17,6 @@ type Config struct {
 // This function only returns hard-coded defaults without any env parsing
 func NewDefaultConfig() *Config {
 	return &Config{
-		Enabled:          true,
 		Domains:          []string{},
 		CheckTimeout:     5 * time.Second,
 		CheckInterval:    5 * time.Minute,

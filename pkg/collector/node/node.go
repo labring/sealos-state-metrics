@@ -106,6 +106,8 @@ func (c *Collector) Start(ctx context.Context) error {
 
 	c.logger.Info("Node collector started successfully")
 
+	c.SetReady(true)
+
 	return nil
 }
 

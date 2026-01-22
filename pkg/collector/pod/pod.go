@@ -153,6 +153,8 @@ func (c *Collector) Start(ctx context.Context) error {
 
 	c.logger.Info("Pod collector started successfully")
 
+	c.SetReady(true)
+
 	return nil
 }
 

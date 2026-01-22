@@ -1,7 +1,6 @@
 package imagepull
 
 import (
-	"errors"
 	"time"
 
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
@@ -25,10 +24,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	if err := factoryCtx.ConfigLoader.LoadModuleConfig("collectors.imagepull", cfg); err != nil {
 		factoryCtx.Logger.WithError(err).
 			Debug("Failed to load imagepull collector config, using defaults")
-	}
-
-	if !cfg.Enabled {
-		return nil, errors.New("imagepull collector is not enabled")
 	}
 
 	c := &Collector{

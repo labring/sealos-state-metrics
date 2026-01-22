@@ -1,7 +1,6 @@
 package zombie
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
@@ -27,10 +26,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	if err := factoryCtx.ConfigLoader.LoadModuleConfig("collectors.zombie", cfg); err != nil {
 		factoryCtx.Logger.WithError(err).
 			Debug("Failed to load zombie collector config, using defaults")
-	}
-
-	if !cfg.Enabled {
-		return nil, errors.New("zombie collector is not enabled")
 	}
 
 	// Create metrics clientset

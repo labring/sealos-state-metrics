@@ -177,6 +177,9 @@ func (c *Collector) pollLoop() {
 	// Do initial check
 	_ = c.Poll(c.Context())
 
+	// Mark as ready after first poll completes
+	c.SetReady(true)
+
 	for {
 		select {
 		case <-ticker.C:

@@ -19,8 +19,10 @@ type BaseCollector struct {
 	requiresLeaderElection bool
 	logger                 *log.Entry
 
-	mu      sync.RWMutex
-	started atomic.Bool
+	mu        sync.RWMutex
+	started   atomic.Bool
+	ready     atomic.Bool
+	readyCond *sync.Cond
 	//nolint:containedctx // Context is intentionally stored to manage collector lifecycle between Start/Stop
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -39,13 +41,15 @@ func NewBaseCollector(
 	collectorType collector.CollectorType,
 	logger *log.Entry,
 ) *BaseCollector {
-	return &BaseCollector{
+	bc := &BaseCollector{
 		name:                   name,
 		collectorType:          collectorType,
 		requiresLeaderElection: true, // Default: require leader election
 		logger:                 logger,
 		descs:                  make([]*prometheus.Desc, 0),
 	}
+	bc.readyCond = sync.NewCond(&bc.mu)
+	return bc
 }
 
 // NewBaseCollectorWithLeaderElection creates a new BaseCollector with custom leader election requirement
@@ -55,13 +59,15 @@ func NewBaseCollectorWithLeaderElection(
 	requiresLeaderElection bool,
 	logger *log.Entry,
 ) *BaseCollector {
-	return &BaseCollector{
+	bc := &BaseCollector{
 		name:                   name,
 		collectorType:          collectorType,
 		requiresLeaderElection: requiresLeaderElection,
 		logger:                 logger,
 		descs:                  make([]*prometheus.Desc, 0),
 	}
+	bc.readyCond = sync.NewCond(&bc.mu)
+	return bc
 }
 
 // Name returns the collector name
@@ -121,6 +127,7 @@ func (b *BaseCollector) Stop() error {
 	}
 
 	b.started.Store(false)
+	b.ready.Store(false)
 
 	b.logger.WithField("name", b.name).Info("Collector stopped")
 
@@ -130,6 +137,52 @@ func (b *BaseCollector) Stop() error {
 // IsStarted returns whether the collector is started
 func (b *BaseCollector) IsStarted() bool {
 	return b.started.Load()
+}
+
+// SetReady marks the collector as ready to collect metrics
+func (b *BaseCollector) SetReady(ready bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.ready.Store(ready)
+	if ready {
+		b.logger.WithField("name", b.name).Debug("Collector marked as ready")
+		// Broadcast to all waiting goroutines
+		b.readyCond.Broadcast()
+	}
+}
+
+// IsReady returns whether the collector is ready to collect metrics
+func (b *BaseCollector) IsReady() bool {
+	return b.ready.Load()
+}
+
+// WaitReady blocks until the collector is ready to collect metrics
+// Returns immediately if already ready, or if context is cancelled
+func (b *BaseCollector) WaitReady(ctx context.Context) error {
+	// Fast path: already ready
+	if b.ready.Load() {
+		return nil
+	}
+
+	// Wait for ready signal or context cancellation
+	done := make(chan struct{})
+	go func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+
+		for !b.ready.Load() {
+			b.readyCond.Wait()
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Context returns the collector's context
@@ -188,6 +241,17 @@ func (b *BaseCollector) SetCollectFunc(f func(ch chan<- prometheus.Metric)) {
 
 // Collect calls the collector-specific collect function
 func (b *BaseCollector) Collect(ch chan<- prometheus.Metric) {
+	// Only collect metrics if the collector has been started
+	if !b.started.Load() {
+		return
+	}
+
+	// Check if collector is ready
+	if !b.ready.Load() {
+		b.logger.WithField("name", b.name).Warn("Collector not ready, skipping metric collection")
+		return
+	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
