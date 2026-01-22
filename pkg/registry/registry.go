@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	log "github.com/sirupsen/logrus"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/config"
@@ -469,34 +470,46 @@ func (pc *PrometheusCollector) emitCollectorMetrics(
 
 // Collect implements prometheus.Collector
 func (pc *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
-	// Copy collectors map to reduce lock contention
+	// Copy collectors map and instance to reduce lock contention
 	pc.registry.mu.RLock()
-
-	collectors := make(map[string]collector.Collector, len(pc.registry.collectors))
-	maps.Copy(collectors, pc.registry.collectors)
-
+	collectors := maps.Clone(pc.registry.collectors)
+	instance := pc.registry.instance
 	pc.registry.mu.RUnlock()
 
 	logger := log.WithField("module", "registry")
 
-	// Collect from all collectors concurrently
-	var wg sync.WaitGroup
+	// Setup metric wrapper if instance is configured
+	metricCh := ch
+	var wrapperWg sync.WaitGroup
+	if instance != "" {
+		wrapperCh := make(chan prometheus.Metric, 100)
+		metricCh = wrapperCh
 
+		wrapperWg.Go(func() {
+			wrapMetricsWithInstance(wrapperCh, ch, instance)
+		})
+	}
+
+	// Collect from all collectors concurrently
+	var collectWg sync.WaitGroup
 	resultCh := make(chan collectorResult, len(collectors))
 
 	for name, c := range collectors {
-		wg.Add(1)
-
-		go func(collectorName string, col collector.Collector) {
-			defer wg.Done()
-
-			result := collectFromCollector(collectorName, col, ch, logger)
+		collectWg.Go(func() {
+			result := collectFromCollector(name, c, metricCh, logger)
 			resultCh <- result
-		}(name, c)
+		})
 	}
 
-	wg.Wait()
+	// Wait for all collectors to finish
+	collectWg.Wait()
 	close(resultCh)
+
+	// If wrapper is running, close wrapper channel and wait for it
+	if instance != "" {
+		close(metricCh)
+		wrapperWg.Wait()
+	}
 
 	// Collect results and emit performance metrics
 	results := make([]collectorResult, 0, len(collectors))
@@ -505,4 +518,46 @@ func (pc *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	pc.emitCollectorMetrics(results, ch)
+}
+
+// wrapMetricsWithInstance wraps metrics by adding instance label
+func wrapMetricsWithInstance(
+	source <-chan prometheus.Metric,
+	dest chan<- prometheus.Metric,
+	instance string,
+) {
+	for metric := range source {
+		wrappedMetric := &metricWithInstance{
+			Metric:   metric,
+			instance: instance,
+		}
+		dest <- wrappedMetric
+	}
+}
+
+// metricWithInstance wraps a prometheus.Metric and adds instance label
+type metricWithInstance struct {
+	prometheus.Metric
+	instance string
+}
+
+// Write implements prometheus.Metric by adding instance label
+func (m *metricWithInstance) Write(out *dto.Metric) error {
+	// First, write the original metric
+	if err := m.Metric.Write(out); err != nil {
+		return err
+	}
+
+	// Add instance label
+	out.Label = append(out.Label, &dto.LabelPair{
+		Name:  stringPtr("instance"),
+		Value: stringPtr(m.instance),
+	})
+
+	return nil
+}
+
+// stringPtr returns a pointer to the given string
+func stringPtr(s string) *string {
+	return &s
 }

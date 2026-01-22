@@ -2,7 +2,6 @@ package zombie
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
@@ -47,73 +45,6 @@ func (c *Collector) initMetrics(namespace string) {
 
 	// Register descriptors
 	c.MustRegisterDesc(c.nodeKubeletMetricsAvailable)
-}
-
-// Start starts the collector
-func (c *Collector) Start(ctx context.Context) error {
-	if err := c.BaseCollector.Start(ctx); err != nil {
-		return err
-	}
-
-	// Create informer factory
-	factory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
-
-	// Create node informer
-	c.podInformer = factory.Core().V1().Nodes().Informer()
-	//nolint:errcheck // AddEventHandler returns (registration, error) but error is always nil in client-go
-	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj any) {
-			node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
-
-			c.mu.Lock()
-			c.nodes[node.Name] = node.DeepCopy()
-			c.mu.Unlock()
-
-			c.logger.WithField("node", node.Name).Debug("Node added")
-		},
-		UpdateFunc: func(oldObj, newObj any) {
-			node := newObj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
-
-			c.mu.Lock()
-			c.nodes[node.Name] = node.DeepCopy()
-			c.mu.Unlock()
-
-			c.logger.WithField("node", node.Name).Debug("Node updated")
-		},
-		DeleteFunc: func(obj any) {
-			node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
-
-			c.mu.Lock()
-			delete(c.nodes, node.Name)
-			delete(c.nodeHasMetrics, node.Name)
-			c.mu.Unlock()
-
-			c.logger.WithField("node", node.Name).Debug("Node deleted")
-		},
-	})
-
-	// Start informer
-	factory.Start(c.stopCh)
-
-	// Wait for cache sync
-	c.logger.Info("Waiting for zombie collector informer cache sync")
-
-	if !cache.WaitForCacheSync(c.stopCh, c.podInformer.HasSynced) {
-		return errors.New("failed to sync zombie collector informer cache")
-	}
-
-	// Start polling goroutine
-	go c.pollLoop()
-
-	c.logger.Info("Zombie collector started successfully")
-
-	return nil
-}
-
-// Stop stops the collector
-func (c *Collector) Stop() error {
-	close(c.stopCh)
-	return c.BaseCollector.Stop()
 }
 
 // HasSynced returns true if the informer has synced
@@ -170,12 +101,12 @@ func (c *Collector) Poll(ctx context.Context) error {
 }
 
 // pollLoop runs the polling loop
-func (c *Collector) pollLoop() {
+func (c *Collector) pollLoop(ctx context.Context) {
 	ticker := time.NewTicker(c.config.CheckInterval)
 	defer ticker.Stop()
 
 	// Do initial check
-	_ = c.Poll(c.Context())
+	_ = c.Poll(ctx)
 
 	// Mark as ready after first poll completes
 	c.SetReady(true)
@@ -183,8 +114,8 @@ func (c *Collector) pollLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			_ = c.Poll(c.Context())
-		case <-c.stopCh:
+			_ = c.Poll(ctx)
+		case <-ctx.Done():
 			return
 		}
 	}

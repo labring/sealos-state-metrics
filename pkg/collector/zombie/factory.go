@@ -1,12 +1,17 @@
 package zombie
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
@@ -39,6 +44,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			collectorName,
 			collector.TypePolling,
 			factoryCtx.Logger,
+			base.WithWaitReadyOnCollect(true),
 		),
 		client:           factoryCtx.Client,
 		metricsClientset: metricsClientset,
@@ -50,7 +56,73 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	}
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
-	c.SetCollectFunc(c.collect)
+
+	// Set lifecycle hooks
+	c.SetLifecycle(base.LifecycleFuncs{
+		StartFunc: func(ctx context.Context) error {
+			// Recreate stopCh to support restart
+			c.stopCh = make(chan struct{})
+
+			// Create informer factory
+			factory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
+
+			// Create node informer
+			c.podInformer = factory.Core().V1().Nodes().Informer()
+			//nolint:errcheck // AddEventHandler returns (registration, error) but error is always nil in client-go
+			c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj any) {
+					node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					c.nodes[node.Name] = node.DeepCopy()
+					c.mu.Unlock()
+
+					c.logger.WithField("node", node.Name).Debug("Node added")
+				},
+				UpdateFunc: func(oldObj, newObj any) {
+					node := newObj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					c.nodes[node.Name] = node.DeepCopy()
+					c.mu.Unlock()
+
+					c.logger.WithField("node", node.Name).Debug("Node updated")
+				},
+				DeleteFunc: func(obj any) {
+					node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					delete(c.nodes, node.Name)
+					delete(c.nodeHasMetrics, node.Name)
+					c.mu.Unlock()
+
+					c.logger.WithField("node", node.Name).Debug("Node deleted")
+				},
+			})
+
+			// Start informer
+			factory.Start(c.stopCh)
+
+			// Wait for cache sync
+			c.logger.Info("Waiting for zombie collector informer cache sync")
+
+			if !cache.WaitForCacheSync(c.stopCh, c.podInformer.HasSynced) {
+				return errors.New("failed to sync zombie collector informer cache")
+			}
+
+			// Start polling goroutine
+			go c.pollLoop(ctx)
+
+			c.logger.Info("Zombie collector started successfully")
+
+			return nil
+		},
+		StopFunc: func() error {
+			close(c.stopCh)
+			return nil
+		},
+		CollectFunc: c.collect,
+	})
 
 	return c, nil
 }

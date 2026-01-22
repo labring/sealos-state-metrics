@@ -37,27 +37,6 @@ func (c *Collector) initMetrics(namespace string) {
 	c.MustRegisterDesc(c.balanceGauge)
 }
 
-// Start starts the collector
-func (c *Collector) Start(ctx context.Context) error {
-	if err := c.BaseCollector.Start(ctx); err != nil {
-		return err
-	}
-
-	// Start background polling
-	go c.pollLoop()
-
-	c.logger.Info("CloudBalance collector started successfully")
-
-	return nil
-}
-
-// Stop stops the collector
-func (c *Collector) Stop() error {
-	// BaseCollector.Stop() will cancel the context,
-	// which will cause pollLoop to exit via Context().Done()
-	return c.BaseCollector.Stop()
-}
-
 // HasSynced returns true (polling collector is always synced)
 func (c *Collector) HasSynced() bool {
 	return true
@@ -69,9 +48,9 @@ func (c *Collector) Interval() time.Duration {
 }
 
 // pollLoop periodically queries cloud balances
-func (c *Collector) pollLoop() {
+func (c *Collector) pollLoop(ctx context.Context) {
 	// Initial poll
-	_ = c.Poll(c.Context())
+	_ = c.Poll(ctx)
 	c.SetReady(true)
 
 	ticker := time.NewTicker(c.config.CheckInterval)
@@ -80,10 +59,10 @@ func (c *Collector) pollLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			if err := c.Poll(c.Context()); err != nil {
+			if err := c.Poll(ctx); err != nil {
 				c.logger.WithError(err).Error("Failed to poll cloud balances")
 			}
-		case <-c.Context().Done():
+		case <-ctx.Done():
 			c.logger.Info("Context cancelled, stopping cloud balance poll loop")
 			return
 		}

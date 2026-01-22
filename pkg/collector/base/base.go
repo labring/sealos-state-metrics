@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,8 @@ type BaseCollector struct {
 	collectorType          collector.CollectorType
 	requiresLeaderElection bool
 	logger                 *log.Entry
+	waitReadyOnCollect     bool          // If true, Collect will wait for collector to be ready
+	waitReadyTimeout       time.Duration // Timeout for WaitReady in Collect
 
 	mu        sync.RWMutex
 	started   atomic.Bool
@@ -31,40 +34,59 @@ type BaseCollector struct {
 	// Metrics registry
 	descs []*prometheus.Desc
 
-	// Collector-specific collect function
-	collectFunc func(ch chan<- prometheus.Metric)
+	// Lifecycle implementation
+	lifecycle Lifecycle
 }
 
-// NewBaseCollector creates a new BaseCollector instance.
-// By default, collectors require leader election (requiresLeaderElection = true).
+// BaseCollectorOption is a functional option for configuring BaseCollector
+type BaseCollectorOption func(*BaseCollector)
+
+// WithLeaderElection returns an option that sets whether this collector requires leader election.
+func WithLeaderElection(required bool) BaseCollectorOption {
+	return func(b *BaseCollector) {
+		b.requiresLeaderElection = required
+	}
+}
+
+// WithWaitReadyOnCollect returns an option that sets whether Collect should wait for the collector to be ready.
+// If enabled, Collect will call WaitReady with the configured timeout before collecting metrics.
+func WithWaitReadyOnCollect(wait bool) BaseCollectorOption {
+	return func(b *BaseCollector) {
+		b.waitReadyOnCollect = wait
+	}
+}
+
+// WithWaitReadyTimeout returns an option that sets the timeout for WaitReady in Collect.
+// Default is 5 seconds. Only applies if waitReadyOnCollect is enabled.
+func WithWaitReadyTimeout(timeout time.Duration) BaseCollectorOption {
+	return func(b *BaseCollector) {
+		b.waitReadyTimeout = timeout
+	}
+}
+
+// NewBaseCollector creates a new BaseCollector instance with functional options.
 func NewBaseCollector(
 	name string,
 	collectorType collector.CollectorType,
 	logger *log.Entry,
+	opts ...BaseCollectorOption,
 ) *BaseCollector {
-	return &BaseCollector{
+	b := &BaseCollector{
 		name:                   name,
 		collectorType:          collectorType,
 		requiresLeaderElection: true, // Default: require leader election
 		logger:                 logger,
+		waitReadyOnCollect:     false,           // Default: don't wait for ready on collect
+		waitReadyTimeout:       5 * time.Second, // Default timeout: 5 seconds
 		descs:                  make([]*prometheus.Desc, 0),
 	}
-}
 
-// NewBaseCollectorWithLeaderElection creates a new BaseCollector with custom leader election requirement
-func NewBaseCollectorWithLeaderElection(
-	name string,
-	collectorType collector.CollectorType,
-	requiresLeaderElection bool,
-	logger *log.Entry,
-) *BaseCollector {
-	return &BaseCollector{
-		name:                   name,
-		collectorType:          collectorType,
-		requiresLeaderElection: requiresLeaderElection,
-		logger:                 logger,
-		descs:                  make([]*prometheus.Desc, 0),
+	// Apply all options
+	for _, opt := range opts {
+		opt(b)
 	}
+
+	return b
 }
 
 // Name returns the collector name
@@ -90,6 +112,25 @@ func (b *BaseCollector) SetRequiresLeaderElection(requires bool) {
 	b.requiresLeaderElection = requires
 }
 
+// SetLifecycle sets the lifecycle hooks for the collector.
+// This allows collectors to add custom start/stop logic without overriding Start()/Stop().
+//
+// Example:
+//
+//	c.SetLifecycle(&MyLifecycle{collector: c})
+//
+// Or using an inline struct:
+//
+//	c.SetLifecycle(base.LifecycleFuncs{
+//	    StartFunc: func(ctx context.Context) error { ... },
+//	    StopFunc: func() error { ... },
+//	})
+func (b *BaseCollector) SetLifecycle(lifecycle Lifecycle) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.lifecycle = lifecycle
+}
+
 // Start initializes the collector context
 func (b *BaseCollector) Start(ctx context.Context) error {
 	if b.started.Load() {
@@ -97,18 +138,25 @@ func (b *BaseCollector) Start(ctx context.Context) error {
 	}
 
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	b.ctx, b.cancel = context.WithCancel(ctx)
 	b.started.Store(true)
 	b.ready.Store(false)
 	b.readyCh = make(chan struct{})
 	b.stoppedCh = make(chan struct{})
+	lifecycle := b.lifecycle
+	b.mu.Unlock()
 
 	b.logger.WithFields(log.Fields{
 		"name": b.name,
 		"type": b.collectorType,
 	}).Info("Collector started")
+
+	// Call lifecycle OnStart hook if set
+	if lifecycle != nil {
+		if err := lifecycle.OnStart(b.ctx); err != nil {
+			return fmt.Errorf("collector %s OnStart failed: %w", b.name, err)
+		}
+	}
 
 	return nil
 }
@@ -117,6 +165,19 @@ func (b *BaseCollector) Start(ctx context.Context) error {
 func (b *BaseCollector) Stop() error {
 	if !b.started.Load() {
 		return fmt.Errorf("collector %s not started", b.name)
+	}
+
+	b.mu.Lock()
+	lifecycle := b.lifecycle
+	b.mu.Unlock()
+
+	// Call lifecycle OnStop hook if set (before cleanup)
+	if lifecycle != nil {
+		if err := lifecycle.OnStop(); err != nil {
+			b.logger.WithError(err).
+				WithField("name", b.name).
+				Warn("Collector OnStop failed, continuing with cleanup")
+		}
 	}
 
 	b.mu.Lock()
@@ -203,13 +264,6 @@ func (b *BaseCollector) WaitReady(ctx context.Context) error {
 	}
 }
 
-// Context returns the collector's context
-func (b *BaseCollector) Context() context.Context {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return b.ctx
-}
-
 // Health performs a basic health check
 func (b *BaseCollector) Health() error {
 	if !b.started.Load() {
@@ -249,32 +303,38 @@ func (b *BaseCollector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// SetCollectFunc sets the function to be called during metric collection
-func (b *BaseCollector) SetCollectFunc(f func(ch chan<- prometheus.Metric)) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.collectFunc = f
-}
-
-// Collect calls the collector-specific collect function
+// Collect calls the lifecycle OnCollect hook
 func (b *BaseCollector) Collect(ch chan<- prometheus.Metric) {
 	// Only collect metrics if the collector has been started
 	if !b.started.Load() {
 		return
 	}
 
-	// Check if collector is ready
-	if !b.ready.Load() {
-		b.logger.WithField("name", b.name).Warn("Collector not ready, skipping metric collection")
-		return
+	// If waitReadyOnCollect is enabled, wait for collector to be ready
+	if b.waitReadyOnCollect {
+		ctx, cancel := context.WithTimeout(context.Background(), b.waitReadyTimeout)
+		defer cancel()
+
+		if err := b.WaitReady(ctx); err != nil {
+			b.logger.WithError(err).
+				WithField("name", b.name).
+				Warn("Collector not ready, skipping metric collection")
+			return
+		}
+	} else {
+		// Check if collector is ready (non-blocking)
+		if !b.ready.Load() {
+			b.logger.WithField("name", b.name).Warn("Collector not ready, skipping metric collection")
+			return
+		}
 	}
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	lifecycle := b.lifecycle
+	b.mu.RUnlock()
 
-	if b.collectFunc != nil {
-		b.collectFunc(ch)
+	if lifecycle != nil {
+		lifecycle.OnCollect(ch)
 	}
 }
 

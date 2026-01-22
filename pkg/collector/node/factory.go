@@ -1,10 +1,15 @@
 package node
 
 import (
+	"context"
+	"errors"
+
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 )
 
 const collectorName = "node"
@@ -30,6 +35,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			collectorName,
 			collector.TypeInformer,
 			factoryCtx.Logger,
+			base.WithWaitReadyOnCollect(true),
 		),
 		client: factoryCtx.Client,
 		config: cfg,
@@ -39,7 +45,70 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	}
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
-	c.SetCollectFunc(c.collect)
+
+	// Set lifecycle hooks
+	c.SetLifecycle(base.LifecycleFuncs{
+		StartFunc: func(ctx context.Context) error {
+			// Recreate stopCh to support restart
+			c.stopCh = make(chan struct{})
+
+			// Create informer factory
+			factory := informers.NewSharedInformerFactory(c.client, c.config.IgnoreNewNodeDuration)
+
+			// Create node informer
+			c.informer = factory.Core().V1().Nodes().Informer()
+
+			// Add event handlers
+			//nolint:errcheck // AddEventHandler returns (registration, error) but error is always nil in client-go
+			c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj any) {
+					node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					c.nodes[node.Name] = node.DeepCopy()
+					c.mu.Unlock()
+					c.logger.WithField("node", node.Name).Debug("Node added")
+				},
+				UpdateFunc: func(oldObj, newObj any) {
+					node := newObj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					c.nodes[node.Name] = node.DeepCopy()
+					c.mu.Unlock()
+					c.logger.WithField("node", node.Name).Debug("Node updated")
+				},
+				DeleteFunc: func(obj any) {
+					node := obj.(*corev1.Node) //nolint:errcheck // Type assertion is safe from informer
+
+					c.mu.Lock()
+					delete(c.nodes, node.Name)
+					c.mu.Unlock()
+					c.logger.WithField("node", node.Name).Debug("Node deleted")
+				},
+			})
+
+			// Start informer
+			factory.Start(c.stopCh)
+
+			// Wait for cache sync
+			c.logger.Info("Waiting for node informer cache sync")
+
+			if !cache.WaitForCacheSync(c.stopCh, c.informer.HasSynced) {
+				return errors.New("failed to sync node informer cache")
+			}
+
+			c.logger.Info("Node collector started successfully")
+
+			c.SetReady(true)
+
+			return nil
+		},
+		StopFunc: func() error {
+			close(c.stopCh)
+			return nil
+		},
+		CollectFunc: c.collect,
+	})
 
 	return c, nil
 }

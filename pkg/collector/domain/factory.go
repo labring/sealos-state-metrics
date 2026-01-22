@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"context"
+
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
@@ -29,10 +31,10 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			collectorName,
 			collector.TypePolling,
 			factoryCtx.Logger,
+			base.WithWaitReadyOnCollect(true),
 		),
 		config: cfg,
 		ips:    make(map[string]*IPHealth),
-		stopCh: make(chan struct{}),
 		logger: factoryCtx.Logger,
 	}
 
@@ -45,7 +47,20 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	)
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
-	c.SetCollectFunc(c.collect)
+
+	// Set lifecycle hooks
+	c.SetLifecycle(base.LifecycleFuncs{
+		StartFunc: func(ctx context.Context) error {
+			// Start polling goroutine
+			go c.pollLoop(ctx)
+			c.logger.Info("Domain collector started successfully")
+			return nil
+		},
+		StopFunc: func() error {
+			return nil
+		},
+		CollectFunc: c.collect,
+	})
 
 	return c, nil
 }

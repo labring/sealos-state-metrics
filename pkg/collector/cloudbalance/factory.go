@@ -1,6 +1,8 @@
 package cloudbalance
 
 import (
+	"context"
+
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
@@ -29,6 +31,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			collectorName,
 			collector.TypePolling,
 			factoryCtx.Logger,
+			base.WithWaitReadyOnCollect(true),
 		),
 		config:   cfg,
 		balances: make(map[string]float64),
@@ -36,7 +39,17 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	}
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
-	c.SetCollectFunc(c.collect)
+
+	// Set lifecycle hooks
+	c.SetLifecycle(base.LifecycleFuncs{
+		StartFunc: func(ctx context.Context) error {
+			// Start background polling
+			go c.pollLoop(ctx)
+			c.logger.Info("CloudBalance collector started successfully")
+			return nil
+		},
+		CollectFunc: c.collect,
+	})
 
 	return c, nil
 }

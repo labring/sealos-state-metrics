@@ -16,7 +16,6 @@ type Collector struct {
 
 	config  *Config
 	checker *DomainChecker
-	stopCh  chan struct{}
 	logger  *log.Entry
 
 	mu  sync.RWMutex
@@ -53,26 +52,6 @@ func (c *Collector) initMetrics(namespace string) {
 	c.MustRegisterDesc(c.domainStatus)
 	c.MustRegisterDesc(c.domainCertExpiry)
 	c.MustRegisterDesc(c.domainResponseTime)
-}
-
-// Start starts the collector
-func (c *Collector) Start(ctx context.Context) error {
-	if err := c.BaseCollector.Start(ctx); err != nil {
-		return err
-	}
-
-	// Start polling goroutine
-	go c.pollLoop()
-
-	c.logger.Info("Domain collector started successfully")
-
-	return nil
-}
-
-// Stop stops the collector
-func (c *Collector) Stop() error {
-	close(c.stopCh)
-	return c.BaseCollector.Stop()
 }
 
 // HasSynced returns true (polling collector is always synced)
@@ -134,12 +113,12 @@ func (c *Collector) Poll(ctx context.Context) error {
 }
 
 // pollLoop runs the polling loop
-func (c *Collector) pollLoop() {
+func (c *Collector) pollLoop(ctx context.Context) {
 	ticker := time.NewTicker(c.config.CheckInterval)
 	defer ticker.Stop()
 
 	// Do initial check
-	_ = c.Poll(c.Context())
+	_ = c.Poll(ctx)
 
 	// Mark as ready after first poll completes
 	c.SetReady(true)
@@ -147,8 +126,8 @@ func (c *Collector) pollLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			_ = c.Poll(c.Context())
-		case <-c.stopCh:
+			_ = c.Poll(ctx)
+		case <-ctx.Done():
 			return
 		}
 	}

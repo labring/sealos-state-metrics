@@ -2,7 +2,6 @@ package imagepull
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
@@ -79,62 +77,21 @@ func (c *Collector) initMetrics(namespace string) {
 	c.MustRegisterDesc(c.imagePullSlow)
 }
 
-// Start starts the collector
-func (c *Collector) Start(ctx context.Context) error {
-	if err := c.BaseCollector.Start(ctx); err != nil {
-		return err
-	}
-
-	// Create informer factory
-	factory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
-
-	// Create pod informer
-	c.podInformer = factory.Core().V1().Pods().Informer()
-	//nolint:errcheck // AddEventHandler returns (registration, error) but error is always nil in client-go
-	c.podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    c.handlePodAdd,
-		UpdateFunc: c.handlePodUpdate,
-		DeleteFunc: c.handlePodDelete,
-	})
-
-	// Start informers
-	factory.Start(c.stopCh)
-
-	// Wait for cache sync
-	c.logger.Info("Waiting for imagepull informer cache sync")
-
-	if !cache.WaitForCacheSync(c.stopCh, c.podInformer.HasSynced) {
-		return errors.New("failed to sync imagepull informer cache")
-	}
-
-	c.logger.Info("ImagePull collector started successfully")
-
-	c.SetReady(true)
-
-	return nil
-}
-
-// Stop stops the collector
-func (c *Collector) Stop() error {
-	close(c.stopCh)
-	return c.BaseCollector.Stop()
-}
-
 // HasSynced returns true if the informer has synced
 func (c *Collector) HasSynced() bool {
 	return c.podInformer != nil && c.podInformer.HasSynced()
 }
 
 // handlePodAdd handles pod add events
-func (c *Collector) handlePodAdd(obj any) {
+func (c *Collector) handlePodAdd(ctx context.Context, obj any) {
 	pod := obj.(*corev1.Pod) //nolint:errcheck // Type assertion is safe from informer
-	c.processPod(pod)
+	c.processPod(ctx, pod)
 }
 
 // handlePodUpdate handles pod update events
-func (c *Collector) handlePodUpdate(oldObj, newObj any) {
+func (c *Collector) handlePodUpdate(ctx context.Context, oldObj, newObj any) {
 	pod := newObj.(*corev1.Pod) //nolint:errcheck // Type assertion is safe from informer
-	c.processPod(pod)
+	c.processPod(ctx, pod)
 }
 
 // handlePodDelete handles pod delete events
@@ -167,7 +124,7 @@ func (c *Collector) handlePodDelete(obj any) {
 }
 
 // processPod processes a pod to extract image pull information
-func (c *Collector) processPod(pod *corev1.Pod) {
+func (c *Collector) processPod(ctx context.Context, pod *corev1.Pod) {
 	// Skip pods not scheduled to any node
 	if pod.Spec.NodeName == "" {
 		return
@@ -215,7 +172,9 @@ func (c *Collector) processPod(pod *corev1.Pod) {
 		if containerStatus.ContainerID == "" &&
 			containerStatus.State.Waiting != nil &&
 			containerStatus.State.Waiting.Reason == "ContainerCreating" {
-			c.checkSlowPull(key, pod, containerStatus, nodeName)
+			c.checkSlowPull(ctx,
+				key, pod, containerStatus, nodeName,
+			)
 		} else {
 			// Clean up slow pull state if container started or failed
 			c.cleanupSlowPull(key)
@@ -235,6 +194,7 @@ func (c *Collector) isImagePullFailure(reason string) bool {
 
 // checkSlowPull checks if an image pull is slow
 func (c *Collector) checkSlowPull(
+	ctx context.Context,
 	key string,
 	pod *corev1.Pod,
 	cs corev1.ContainerStatus,
@@ -247,7 +207,9 @@ func (c *Collector) checkSlowPull(
 
 	// Create timer for slow pull detection
 	timer := time.AfterFunc(c.config.SlowPullThreshold, func() {
-		c.handleSlowPullTimer(key, pod.Namespace, pod.Name, cs.Name, cs.Image, nodeName)
+		c.handleSlowPullTimer(ctx,
+			key, pod.Namespace, pod.Name, cs.Name, cs.Image, nodeName,
+		)
 	})
 
 	c.slowTimers[key] = timer
@@ -261,6 +223,7 @@ func (c *Collector) checkSlowPull(
 
 // handleSlowPullTimer is called when slow pull timer fires
 func (c *Collector) handleSlowPullTimer(
+	ctx context.Context,
 	key, namespace, podName, containerName, image, nodeName string,
 ) {
 	c.mu.Lock()
@@ -270,7 +233,7 @@ func (c *Collector) handleSlowPullTimer(
 	delete(c.slowTimers, key)
 
 	// Re-check pod status
-	pod, err := c.client.CoreV1().Pods(namespace).Get(c.Context(), podName, metav1.GetOptions{})
+	pod, err := c.client.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		c.logger.WithError(err).WithFields(log.Fields{
 			"pod":       namespace + "/" + podName,
