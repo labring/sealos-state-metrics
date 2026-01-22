@@ -6,10 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,6 +38,7 @@ type Server struct {
 
 	// Leader election management
 	leCtxCancel context.CancelFunc
+	leDoneCh    chan struct{} // Closed when leader election goroutine exits
 	leMu        sync.Mutex
 }
 
@@ -56,6 +54,18 @@ func NewServer(cfg *config.GlobalConfig, configContent []byte) *Server {
 
 // Run starts the server and blocks until it receives a shutdown signal
 func (s *Server) Run(ctx context.Context) error {
+	// Initialize server
+	if err := s.init(ctx); err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+	// Start HTTP server and wait for shutdown
+	return s.serveAndWait()
+}
+
+func (s *Server) init(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.serverCtx = ctx
 
 	// Initialize Kubernetes client and collectors
@@ -71,12 +81,7 @@ func (s *Server) Run(ctx context.Context) error {
 	s.promRegistry.MustRegister(registry.NewPrometheusCollector(s.registry))
 
 	// Start collectors (with or without leader election)
-	if err := s.startCollectors(); err != nil {
-		return err
-	}
-
-	// Start HTTP server and wait for shutdown
-	return s.serveAndWait()
+	return s.startCollectors()
 }
 
 // initKubernetesClient creates and stores the Kubernetes client
@@ -118,7 +123,7 @@ func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
 	}
 }
 
-// serveAndWait starts the HTTP server and waits for shutdown signal
+// serveAndWait starts the HTTP server and waits for context cancellation
 func (s *Server) serveAndWait() error {
 	mux := http.NewServeMux()
 	s.setupRoutes(mux)
@@ -138,14 +143,9 @@ func (s *Server) serveAndWait() error {
 		}
 	}()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
 	select {
 	case err := <-errChan:
 		return err
-	case sig := <-sigChan:
-		log.WithField("signal", sig.String()).Info("Received shutdown signal")
 	case <-s.serverCtx.Done():
 		log.Info("Context cancelled, shutting down")
 	}
@@ -200,19 +200,24 @@ func (s *Server) setupLeaderElection() error {
 		},
 	)
 
-	// Create cancellable context and store for later cleanup
+	// Create cancellable context and done channel for cleanup
 	s.leMu.Lock()
+	defer s.leMu.Unlock()
 	leCtx, leCtxCancel := context.WithCancel(s.serverCtx)
 	s.leCtxCancel = leCtxCancel
+	s.leDoneCh = make(chan struct{})
 	s.leaderElector = elector
-	s.leMu.Unlock()
 
 	go func() {
+		defer close(s.leDoneCh)
+
 		log.Info("Starting leader election")
 
 		if err := elector.Run(leCtx); err != nil {
 			log.WithError(err).Error("Leader election exited with error")
 		}
+
+		log.Info("Leader election stopped")
 	}()
 
 	return nil
@@ -222,18 +227,22 @@ func (s *Server) setupLeaderElection() error {
 func (s *Server) stopLeaderElection() {
 	s.leMu.Lock()
 	defer s.leMu.Unlock()
+	leCtxCancel := s.leCtxCancel
+	leDoneCh := s.leDoneCh
 
-	if s.leCtxCancel != nil {
+	if leCtxCancel != nil {
 		log.Info("Stopping leader election and releasing lease")
-		s.leCtxCancel()
-		// Give leader election time to release the lease gracefully
-		time.Sleep(500 * time.Millisecond)
+		leCtxCancel()
+
+		// Wait for leader election goroutine to exit
+		if leDoneCh != nil {
+			<-leDoneCh
+		}
 
 		s.leCtxCancel = nil
+		s.leDoneCh = nil
+		s.leaderElector = nil
 	}
-
-	// Reset leaderElector to ensure clean state for potential restart
-	s.leaderElector = nil
 }
 
 // Reload reloads the server with new configuration.
@@ -247,7 +256,7 @@ func (s *Server) Reload(newConfigContent []byte, newConfig *config.GlobalConfig)
 	logger.Info("Starting server reload")
 
 	if s.serverCtx == nil {
-		return errors.New("server context is nil")
+		return errors.New("server not running, context is nil")
 	}
 
 	// Stop current leader election

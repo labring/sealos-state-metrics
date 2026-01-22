@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/zijiren233/sealos-state-metric/app"
@@ -64,9 +66,11 @@ func main() {
 		}
 	}
 
-	// Run server
-	ctx := context.Background()
+	// Setup signal handling with cancellable context
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
+	// Start config reloader
 	if reloader != nil {
 		if err := reloader.Start(ctx); err != nil {
 			log.WithError(err).Fatal("Failed to start config reloader")
@@ -80,6 +84,7 @@ func main() {
 		log.WithField("config_path", cfg.ConfigPath).Info("Configuration hot reload enabled")
 	}
 
+	// Run server (blocks until context is cancelled or error)
 	if err := server.Run(ctx); err != nil {
 		log.WithError(err).Fatal("Server exited with error")
 	}
