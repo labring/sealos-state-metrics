@@ -3,6 +3,7 @@ package pod
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,23 +20,20 @@ import (
 type Collector struct {
 	*base.BaseCollector
 
-	client     kubernetes.Interface
-	config     *Config
-	informer   cache.SharedIndexInformer
-	aggregator *PodAggregator
-	stopCh     chan struct{}
-	logger     *log.Entry
+	client   kubernetes.Interface
+	config   *Config
+	informer cache.SharedIndexInformer
+	stopCh   chan struct{}
+	logger   *log.Entry
 
 	mu   sync.RWMutex
 	pods map[string]*corev1.Pod // key: namespace/name
 
 	// Metrics
-	podStatusPhase      *prometheus.Desc
-	podRestartTotal     *prometheus.Desc
-	podCondition        *prometheus.Desc
-	podOOMKilledTotal   *prometheus.Desc
-	podAbnormalDuration *prometheus.Desc
-	podAggregatedCount  *prometheus.Desc
+	podStatusPhase    *prometheus.Desc
+	podRestartTotal   *prometheus.Desc
+	podCondition      *prometheus.Desc
+	podOOMKilledTotal *prometheus.Desc
 }
 
 // initMetrics initializes Prometheus metric descriptors
@@ -64,26 +62,12 @@ func (c *Collector) initMetrics(namespace string) {
 		[]string{"namespace", "pod", "container"},
 		nil,
 	)
-	c.podAbnormalDuration = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "pod", "abnormal_duration_seconds"),
-		"Duration the pod has been abnormal",
-		[]string{"namespace", "pod"},
-		nil,
-	)
-	c.podAggregatedCount = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "pod", "aggregated_count"),
-		"Number of pods in this phase (aggregated)",
-		[]string{"namespace", "phase"},
-		nil,
-	)
 
 	// Register descriptors
 	c.MustRegisterDesc(c.podStatusPhase)
 	c.MustRegisterDesc(c.podRestartTotal)
 	c.MustRegisterDesc(c.podCondition)
 	c.MustRegisterDesc(c.podOOMKilledTotal)
-	c.MustRegisterDesc(c.podAbnormalDuration)
-	c.MustRegisterDesc(c.podAggregatedCount)
 }
 
 // Start starts the collector
@@ -92,13 +76,7 @@ func (c *Collector) Start(ctx context.Context) error {
 		return err
 	}
 
-	// Start aggregator if enabled
-	if c.aggregator != nil {
-		c.aggregator.Start()
-	}
-
 	// Create informer factory
-	// TODO: Support filtering by namespaces
 	factory := informers.NewSharedInformerFactory(c.client, 10*time.Minute)
 
 	// Create pod informer
@@ -109,15 +87,17 @@ func (c *Collector) Start(ctx context.Context) error {
 	c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pod := obj.(*corev1.Pod) //nolint:errcheck // Type assertion is safe from informer
+
+			// Skip namespaces starting with "ns-"
+			if strings.HasPrefix(pod.Namespace, "ns-") {
+				return
+			}
+
 			key := podKey(pod)
 
 			c.mu.Lock()
 			c.pods[key] = pod.DeepCopy()
 			c.mu.Unlock()
-
-			if c.aggregator != nil {
-				c.aggregator.AddPod(pod)
-			}
 
 			c.logger.WithFields(log.Fields{
 				"pod":   key,
@@ -126,15 +106,17 @@ func (c *Collector) Start(ctx context.Context) error {
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			pod := newObj.(*corev1.Pod) //nolint:errcheck // Type assertion is safe from informer
+
+			// Skip namespaces starting with "ns-"
+			if strings.HasPrefix(pod.Namespace, "ns-") {
+				return
+			}
+
 			key := podKey(pod)
 
 			c.mu.Lock()
 			c.pods[key] = pod.DeepCopy()
 			c.mu.Unlock()
-
-			if c.aggregator != nil {
-				c.aggregator.AddPod(pod)
-			}
 
 			c.logger.WithFields(log.Fields{
 				"pod":   key,
@@ -143,15 +125,17 @@ func (c *Collector) Start(ctx context.Context) error {
 		},
 		DeleteFunc: func(obj any) {
 			pod := obj.(*corev1.Pod) //nolint:errcheck // Type assertion is safe from informer
+
+			// Skip namespaces starting with "ns-"
+			if strings.HasPrefix(pod.Namespace, "ns-") {
+				return
+			}
+
 			key := podKey(pod)
 
 			c.mu.Lock()
 			delete(c.pods, key)
 			c.mu.Unlock()
-
-			if c.aggregator != nil {
-				c.aggregator.RemovePod(pod)
-			}
 
 			c.logger.WithField("pod", key).Debug("Pod deleted")
 		},
@@ -175,11 +159,6 @@ func (c *Collector) Start(ctx context.Context) error {
 // Stop stops the collector
 func (c *Collector) Stop() error {
 	close(c.stopCh)
-
-	if c.aggregator != nil {
-		c.aggregator.Stop()
-	}
-
 	return c.BaseCollector.Stop()
 }
 
@@ -253,34 +232,6 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 					)
 				}
 			}
-		}
-
-		// Abnormal duration
-		if c.aggregator != nil {
-			duration := c.aggregator.GetAbnormalDuration(pod.Namespace, pod.Name)
-			if duration > c.config.AbnormalThreshold {
-				ch <- prometheus.MustNewConstMetric(
-					c.podAbnormalDuration,
-					prometheus.GaugeValue,
-					duration.Seconds(),
-					pod.Namespace,
-					pod.Name,
-				)
-			}
-		}
-	}
-
-	// Collect aggregated metrics
-	if c.aggregator != nil {
-		aggregated := c.aggregator.GetAggregated()
-		for _, agg := range aggregated {
-			ch <- prometheus.MustNewConstMetric(
-				c.podAggregatedCount,
-				prometheus.GaugeValue,
-				float64(agg.Count),
-				agg.Namespace,
-				string(agg.Phase),
-			)
 		}
 	}
 }

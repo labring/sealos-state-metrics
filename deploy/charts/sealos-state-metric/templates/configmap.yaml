@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sealos-state-metric.fullname" . }}
+  labels:
+    {{- include "sealos-state-metric.labels" . | nindent 4 }}
+data:
+  # Logging configuration
+  LOGGING_LEVEL: {{ .Values.config.logLevel | quote }}
+  LOGGING_FORMAT: {{ .Values.config.logFormat | quote }}
+  LOGGING_DEBUG: {{ .Values.config.debug | quote }}
+
+  # Server configuration
+  SERVER_ADDRESS: {{ .Values.config.serverAddress | quote }}
+  SERVER_METRICS_PATH: {{ .Values.config.metricsPath | quote }}
+  SERVER_HEALTH_PATH: {{ .Values.config.healthPath | quote }}
+
+  # Kubernetes client configuration
+  {{- if .Values.config.kubernetes.kubeconfig }}
+  KUBERNETES_KUBECONFIG: {{ .Values.config.kubernetes.kubeconfig | quote }}
+  {{- end }}
+  KUBERNETES_QPS: {{ .Values.config.kubernetes.qps | quote }}
+  KUBERNETES_BURST: {{ .Values.config.kubernetes.burst | quote }}
+
+  # Metrics configuration
+  METRICS_NAMESPACE: {{ .Values.config.metricsNamespace | quote }}
+
+  # Leader election configuration
+  LEADER_ELECTION_ENABLED: {{ .Values.config.leaderElection.enabled | quote }}
+  {{- if .Values.config.leaderElection.namespace }}
+  LEADER_ELECTION_NAMESPACE: {{ .Values.config.leaderElection.namespace | quote }}
+  {{- else }}
+  LEADER_ELECTION_NAMESPACE: {{ .Release.Namespace | quote }}
+  {{- end }}
+  LEADER_ELECTION_LEASE_NAME: {{ .Values.config.leaderElection.leaseName | quote }}
+  LEADER_ELECTION_LEASE_DURATION: {{ .Values.config.leaderElection.leaseDuration | quote }}
+  LEADER_ELECTION_RENEW_DEADLINE: {{ .Values.config.leaderElection.renewDeadline | quote }}
+  LEADER_ELECTION_RETRY_PERIOD: {{ .Values.config.leaderElection.retryPeriod | quote }}
+
+  # Enabled collectors
+  ENABLED_COLLECTORS: {{ join "," .Values.config.enabledCollectors | quote }}
+
+  # Domain collector configuration
+  {{- if .Values.config.domain.enabled }}
+  COLLECTORS_DOMAIN_ENABLED: "true"
+  {{- if .Values.config.domain.domains }}
+  COLLECTORS_DOMAIN_DOMAINS: {{ join "," .Values.config.domain.domains | quote }}
+  {{- end }}
+  COLLECTORS_DOMAIN_CHECK_TIMEOUT: {{ .Values.config.domain.checkTimeout | quote }}
+  COLLECTORS_DOMAIN_CHECK_INTERVAL: {{ .Values.config.domain.checkInterval | quote }}
+  COLLECTORS_DOMAIN_INCLUDE_CERT_CHECK: {{ .Values.config.domain.includeCertCheck | quote }}
+  COLLECTORS_DOMAIN_INCLUDE_HTTP_CHECK: {{ .Values.config.domain.includeHTTPCheck | quote }}
+  {{- else }}
+  COLLECTORS_DOMAIN_ENABLED: "false"
+  {{- end }}
+
+  # Node collector configuration
+  {{- if .Values.config.node.enabled }}
+  COLLECTORS_NODE_ENABLED: "true"
+  {{- else }}
+  COLLECTORS_NODE_ENABLED: "false"
+  {{- end }}
+
+  # Pod collector configuration
+  {{- if .Values.config.pod.enabled }}
+  COLLECTORS_POD_ENABLED: "true"
+  COLLECTORS_POD_RESTART_THRESHOLD: {{ .Values.config.pod.restartThreshold | quote }}
+  {{- else }}
+  COLLECTORS_POD_ENABLED: "false"
+  {{- end }}
+
+  # Image pull collector configuration
+  {{- if .Values.config.imagepull.enabled }}
+  COLLECTORS_IMAGEPULL_ENABLED: "true"
+  COLLECTORS_IMAGEPULL_SLOW_PULL_THRESHOLD: {{ .Values.config.imagepull.slowPullThreshold | quote }}
+  {{- else }}
+  COLLECTORS_IMAGEPULL_ENABLED: "false"
+  {{- end }}
+
+  # Zombie collector configuration
+  {{- if .Values.config.zombie.enabled }}
+  COLLECTORS_ZOMBIE_ENABLED: "true"
+  COLLECTORS_ZOMBIE_CHECK_INTERVAL: {{ .Values.config.zombie.checkInterval | quote }}
+  {{- else }}
+  COLLECTORS_ZOMBIE_ENABLED: "false"
+  {{- end }}
+
+  {{- with .Values.env }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}

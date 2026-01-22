@@ -33,13 +33,13 @@ func (c *Collector) initMetrics(namespace string) {
 	c.domainStatus = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "domain", "status"),
 		"Domain IP status (1=ok, 0=error)",
-		[]string{"domain", "ip", "check_type"},
+		[]string{"domain", "ip", "check_type", "error_type"},
 		nil,
 	)
 	c.domainCertExpiry = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "domain", "cert_expiry_seconds"),
 		"Domain certificate expiry in seconds",
-		[]string{"domain", "ip"},
+		[]string{"domain", "ip", "error_type"},
 		nil,
 	)
 	c.domainResponseTime = prometheus.NewDesc(
@@ -166,6 +166,7 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 				ipHealth.Domain,
 				ipHealth.IP,
 				"http",
+				string(ipHealth.HTTPErrorType),
 			)
 
 			if ipHealth.HTTPOk {
@@ -188,6 +189,7 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 				ipHealth.Domain,
 				ipHealth.IP,
 				"cert",
+				string(ipHealth.CertErrorType),
 			)
 
 			if ipHealth.CertOk && ipHealth.CertExpiry > 0 {
@@ -197,6 +199,7 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 					ipHealth.CertExpiry.Seconds(),
 					ipHealth.Domain,
 					ipHealth.IP,
+					string(ipHealth.CertErrorType),
 				)
 			}
 		}

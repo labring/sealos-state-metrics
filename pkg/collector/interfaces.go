@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // CollectorType defines the type of collector
@@ -85,6 +86,7 @@ type ConfigLoader interface {
 type FactoryContext struct {
 	//nolint:containedctx // Context is part of factory parameters struct, passed to factory functions
 	Ctx          context.Context
+	RestConfig   *rest.Config
 	Client       kubernetes.Interface
 	ConfigLoader ConfigLoader // Loader for module-specific configuration (never nil, use NullLoader as fallback)
 

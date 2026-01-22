@@ -1,0 +1,211 @@
+# Default values for sealos-state-metric
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Number of replicas
+replicaCount: 1
+
+# Container image configuration
+image:
+  repository: ghcr.io/labring/sealos-state-metric
+  pullPolicy: IfNotPresent
+  tag: ""  # Overrides the image tag whose default is the chart appVersion
+
+imagePullSecrets: []
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# ServiceAccount configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# RBAC configuration
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# Container security context
+securityContext:
+  # capabilities:
+  #   drop:
+  #   - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 9090
+  targetPort: 9090
+  annotations: {}
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Node selector for pod assignment
+nodeSelector: {}
+
+# Tolerations for pod assignment
+tolerations: []
+
+# Affinity rules for pod assignment
+affinity: {}
+
+# Priority class name for pods
+priorityClassName: ""
+
+# Prometheus ServiceMonitor
+serviceMonitor:
+  # Create ServiceMonitor resource for Prometheus Operator
+  enabled: false
+  # Namespace where ServiceMonitor will be created (defaults to release namespace)
+  namespace: ""
+  # Additional labels for ServiceMonitor
+  labels: {}
+  # Scrape interval
+  interval: 30s
+  # Scrape timeout
+  scrapeTimeout: 10s
+  # Metric relabel configurations
+  metricRelabelings: []
+  # Relabel configurations
+  relabelings: []
+
+# Application configuration
+config:
+  # Log level (debug, info, warn, error)
+  logLevel: info
+
+  # Log format (json, text)
+  logFormat: json
+
+  # Enable debug mode
+  debug: false
+
+  # Server address
+  serverAddress: ":9090"
+
+  # Metrics path
+  metricsPath: "/metrics"
+
+  # Health check path
+  healthPath: "/health"
+
+  # Kubernetes client configuration
+  kubernetes:
+    # Path to kubeconfig file (empty for in-cluster config)
+    kubeconfig: ""
+    # Kubernetes client QPS limit
+    qps: 50
+    # Kubernetes client burst limit
+    burst: 100
+
+  # Prometheus metrics namespace
+  metricsNamespace: "sealos"
+
+  # Leader election configuration
+  leaderElection:
+    # Enable leader election
+    enabled: true
+    # Namespace for leader election lease (empty disables leader election)
+    namespace: ""  # defaults to release namespace
+    # Name of the leader election lease
+    leaseName: "sealos-state-metric"
+    # Leader election lease duration
+    leaseDuration: "15s"
+    # Leader election renew deadline
+    renewDeadline: "10s"
+    # Leader election retry period
+    retryPeriod: "2s"
+
+  # Enabled collectors
+  enabledCollectors:
+    - domain
+    - node
+    - pod
+    - imagepull
+    - zombie
+
+  # Domain collector configuration
+  domain:
+    enabled: true
+    # List of domains to monitor
+    domains: []
+      # - example.com
+      # - api.example.com
+    # Check timeout
+    checkTimeout: "5s"
+    # Check interval
+    checkInterval: "5m"
+    # Include certificate check
+    includeCertCheck: true
+    # Include HTTP check
+    includeHTTPCheck: true
+
+  # Node collector configuration
+  node:
+    enabled: true
+
+  # Pod collector configuration
+  pod:
+    enabled: true
+    # Restart threshold (only report containers with restarts >= threshold)
+    restartThreshold: 5
+
+  # Image pull collector configuration
+  imagepull:
+    enabled: true
+    # Slow pull threshold
+    slowPullThreshold: "5m"
+
+  # Zombie collector configuration
+  zombie:
+    enabled: true
+    # Check interval
+    checkInterval: "30s"
+
+# Extra environment variables
+env: {}
+  # EXAMPLE_VAR: "value"

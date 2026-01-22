@@ -1,0 +1,30 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "sealos-state-metric.fullname" . }}
+  labels:
+    {{- include "sealos-state-metric.labels" . | nindent 4 }}
+rules:
+  # Core resources
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - pods
+      - events
+      - namespaces
+    verbs: ["get", "list", "watch"]
+
+  # Metrics resources
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - nodes
+      - pods
+    verbs: ["get", "list"]
+
+  # Coordination for leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources:
+      - leases
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}

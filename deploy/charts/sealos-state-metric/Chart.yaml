@@ -1,0 +1,14 @@
+apiVersion: v2
+name: sealos-state-metric
+description: Kubernetes state metrics collector for Sealos monitoring
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - kubernetes
+  - metrics
+  - prometheus
+  - monitoring
+  - sealos
+maintainers:
+  - name: sealos

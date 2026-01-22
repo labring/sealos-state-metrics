@@ -44,11 +44,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		logger: factoryCtx.Logger,
 	}
 
-	// Initialize aggregator if enabled
-	if cfg.Aggregator.Enabled {
-		c.aggregator = NewPodAggregator(cfg.Aggregator.WindowSize, factoryCtx.Logger)
-	}
-
 	c.initMetrics(factoryCtx.MetricsNamespace)
 	c.SetCollectFunc(c.collect)
 

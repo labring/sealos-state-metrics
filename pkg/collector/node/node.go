@@ -29,60 +29,28 @@ type Collector struct {
 	nodes map[string]*corev1.Node
 
 	// Metrics
-	nodeCondition           *prometheus.Desc
-	nodeInfo                *prometheus.Desc
-	nodeResourceCapacity    *prometheus.Desc
-	nodeResourceAllocatable *prometheus.Desc
-	nodeTaints              *prometheus.Desc
-	nodeAge                 *prometheus.Desc
+	nodeHealthy   *prometheus.Desc
+	nodeCondition *prometheus.Desc
 }
 
 // initMetrics initializes Prometheus metric descriptors
 func (c *Collector) initMetrics(namespace string) {
+	c.nodeHealthy = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "node", "healthy"),
+		"Node health status (1=healthy, 0=unhealthy)",
+		[]string{"node"},
+		nil,
+	)
 	c.nodeCondition = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "node", "condition"),
-		"Node condition status",
+		"Node abnormal condition status",
 		[]string{"node", "condition", "status"},
-		nil,
-	)
-	c.nodeInfo = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "node", "info"),
-		"Node information",
-		[]string{"node", "kernel_version", "kubelet_version", "container_runtime", "os_image"},
-		nil,
-	)
-	c.nodeResourceCapacity = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "node", "resource_capacity"),
-		"Node resource capacity",
-		[]string{"node", "resource", "unit"},
-		nil,
-	)
-	c.nodeResourceAllocatable = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "node", "resource_allocatable"),
-		"Node resource allocatable",
-		[]string{"node", "resource", "unit"},
-		nil,
-	)
-	c.nodeTaints = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "node", "taints"),
-		"Node taints",
-		[]string{"node", "key", "value", "effect"},
-		nil,
-	)
-	c.nodeAge = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "node", "age_seconds"),
-		"Node age in seconds",
-		[]string{"node"},
 		nil,
 	)
 
 	// Register descriptors
+	c.MustRegisterDesc(c.nodeHealthy)
 	c.MustRegisterDesc(c.nodeCondition)
-	c.MustRegisterDesc(c.nodeInfo)
-	c.MustRegisterDesc(c.nodeResourceCapacity)
-	c.MustRegisterDesc(c.nodeResourceAllocatable)
-	c.MustRegisterDesc(c.nodeTaints)
-	c.MustRegisterDesc(c.nodeAge)
 }
 
 // Start starts the collector
@@ -171,110 +139,111 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		// Node conditions
-		for _, condition := range node.Status.Conditions {
-			status := "unknown"
-			switch condition.Status {
-			case corev1.ConditionTrue:
-				status = "true"
-			case corev1.ConditionFalse:
-				status = "false"
-			}
+		// Check if node is healthy
+		healthy, abnormalConditions := isNodeHealthy(node)
 
+		if healthy {
+			// Node is healthy - only emit node_healthy=1
 			ch <- prometheus.MustNewConstMetric(
-				c.nodeCondition,
+				c.nodeHealthy,
 				prometheus.GaugeValue,
-				boolToFloat64(condition.Status == corev1.ConditionTrue),
+				1,
 				node.Name,
-				string(condition.Type),
-				status,
 			)
-		}
+		} else {
+			// Node is unhealthy - emit node_healthy=0 and all abnormal conditions
+			ch <- prometheus.MustNewConstMetric(
+				c.nodeHealthy,
+				prometheus.GaugeValue,
+				0,
+				node.Name,
+			)
 
-		// Node info
-		ch <- prometheus.MustNewConstMetric(
-			c.nodeInfo,
-			prometheus.GaugeValue,
-			1,
-			node.Name,
-			node.Status.NodeInfo.KernelVersion,
-			node.Status.NodeInfo.KubeletVersion,
-			node.Status.NodeInfo.ContainerRuntimeVersion,
-			node.Status.NodeInfo.OSImage,
-		)
+			// Emit abnormal conditions
+			for _, condition := range abnormalConditions {
+				status := "unknown"
+				switch condition.Status {
+				case corev1.ConditionTrue:
+					status = "true"
+				case corev1.ConditionFalse:
+					status = "false"
+				}
 
-		// Node resources - capacity
-		c.collectResources(ch, node, node.Status.Capacity, c.nodeResourceCapacity)
-
-		// Node resources - allocatable
-		c.collectResources(ch, node, node.Status.Allocatable, c.nodeResourceAllocatable)
-
-		// Node taints
-		if c.config.IncludeTaints {
-			for _, taint := range node.Spec.Taints {
 				ch <- prometheus.MustNewConstMetric(
-					c.nodeTaints,
+					c.nodeCondition,
 					prometheus.GaugeValue,
-					1,
+					boolToFloat64(condition.Status == corev1.ConditionTrue),
 					node.Name,
-					taint.Key,
-					taint.Value,
-					string(taint.Effect),
+					string(condition.Type),
+					status,
 				)
 			}
 		}
-
-		// Node age
-		ch <- prometheus.MustNewConstMetric(
-			c.nodeAge,
-			prometheus.GaugeValue,
-			now.Sub(node.CreationTimestamp.Time).Seconds(),
-			node.Name,
-		)
 	}
 }
 
-// collectResources collects resource metrics
-func (c *Collector) collectResources(
-	ch chan<- prometheus.Metric,
-	node *corev1.Node,
-	resources corev1.ResourceList,
-	desc *prometheus.Desc,
-) {
-	for resourceName, quantity := range resources {
-		var (
-			value float64
-			unit  string
-		)
+// isNodeHealthy checks if a node is healthy
+// A node is considered healthy if:
+// - Ready condition is True
+// - All other conditions (MemoryPressure, DiskPressure, PIDPressure, NetworkUnavailable) are False
+func isNodeHealthy(node *corev1.Node) (bool, []corev1.NodeCondition) {
+	var (
+		ready                 = false
+		hasMemoryPressure     = false
+		hasDiskPressure       = false
+		hasPIDPressure        = false
+		hasNetworkUnavailable = false
+		abnormalConditions    []corev1.NodeCondition
+	)
 
-		switch resourceName {
-		case corev1.ResourceCPU:
-			value = float64(quantity.MilliValue()) / 1000.0
-			unit = "cores"
-		case corev1.ResourceMemory:
-			value = float64(quantity.Value())
-			unit = "bytes"
-		case corev1.ResourcePods:
-			value = float64(quantity.Value())
-			unit = "pods"
-		case corev1.ResourceEphemeralStorage:
-			value = float64(quantity.Value())
-			unit = "bytes"
+	for _, condition := range node.Status.Conditions {
+		switch condition.Type {
+		case corev1.NodeReady:
+			if condition.Status == corev1.ConditionTrue {
+				ready = true
+			} else {
+				abnormalConditions = append(abnormalConditions, condition)
+			}
+		case corev1.NodeMemoryPressure:
+			if condition.Status == corev1.ConditionTrue {
+				hasMemoryPressure = true
+
+				abnormalConditions = append(abnormalConditions, condition)
+			}
+		case corev1.NodeDiskPressure:
+			if condition.Status == corev1.ConditionTrue {
+				hasDiskPressure = true
+
+				abnormalConditions = append(abnormalConditions, condition)
+			}
+		case corev1.NodePIDPressure:
+			if condition.Status == corev1.ConditionTrue {
+				hasPIDPressure = true
+
+				abnormalConditions = append(abnormalConditions, condition)
+			}
+		case corev1.NodeNetworkUnavailable:
+			if condition.Status == corev1.ConditionTrue {
+				hasNetworkUnavailable = true
+
+				abnormalConditions = append(abnormalConditions, condition)
+			}
 		default:
-			// Handle other resources
-			value = float64(quantity.Value())
-			unit = string(resourceName)
+			// Unknown condition type - treat as abnormal if not False
+			if condition.Status != corev1.ConditionFalse {
+				abnormalConditions = append(abnormalConditions, condition)
+			}
 		}
-
-		ch <- prometheus.MustNewConstMetric(
-			desc,
-			prometheus.GaugeValue,
-			value,
-			node.Name,
-			string(resourceName),
-			unit,
-		)
 	}
+
+	// Node is healthy only if Ready and no pressure conditions
+	healthy := ready &&
+		!hasMemoryPressure &&
+		!hasDiskPressure &&
+		!hasPIDPressure &&
+		!hasNetworkUnavailable
+
+	return healthy, abnormalConditions
 }
 
 // boolToFloat64 converts a boolean to a float64

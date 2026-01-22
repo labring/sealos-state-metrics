@@ -1,8 +1,9 @@
 module github.com/zijiren233/sealos-state-metric
 
-go 1.25.6
+go 1.25.0
 
 require (
+	github.com/alecthomas/kong v1.13.0
 	github.com/caarlos0/env/v9 v9.0.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mitchellh/mapstructure v1.5.0
@@ -12,6 +13,7 @@ require (
 	k8s.io/api v0.32.1
 	k8s.io/apimachinery v0.32.1
 	k8s.io/client-go v0.32.1
+	k8s.io/metrics v0.31.4
 )
 
 require (

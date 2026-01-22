@@ -2,55 +2,49 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 
+	"github.com/alecthomas/kong"
 	log "github.com/sirupsen/logrus"
 	"github.com/zijiren233/sealos-state-metric/app"
+	_ "github.com/zijiren233/sealos-state-metric/pkg/collector/all" // Import all collectors
 	"github.com/zijiren233/sealos-state-metric/pkg/config"
 	"github.com/zijiren233/sealos-state-metric/pkg/logger"
 )
 
 func main() {
-	// Parse command-line flags
-	opts := app.NewOptions()
-	opts.AddFlags(flag.CommandLine)
-	flag.Parse()
+	// Parse command-line flags with kong
+	cfg := &config.GlobalConfig{}
+	ctx := kong.Parse(cfg,
+		kong.Name("sealos-state-metric"),
+		kong.Description("Sealos state metrics collector for Kubernetes"),
+		kong.UsageOnError(),
+	)
 
-	// Load configuration
-	loader := config.NewConfigLoader(opts.ConfigFile, opts.EnvFile)
-
-	cfg, err := loader.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
-		os.Exit(1)
+	// Load from .env file if specified
+	if cfg.EnvFile != "" {
+		if err := config.LoadEnvFile(cfg.EnvFile); err != nil {
+			log.WithError(err).Debug("No .env file loaded")
+		} else {
+			log.WithField("file", cfg.EnvFile).Info("Loaded environment from .env file")
+		}
 	}
 
-	// Override config with command-line flags
-	if opts.MetricsAddress != "" {
-		cfg.Server.Address = opts.MetricsAddress
+	// Load configuration from YAML if specified
+	if cfg.ConfigFile != "" {
+		if err := config.LoadFromYAML(cfg.ConfigFile, cfg); err != nil {
+			ctx.Fatalf("Failed to load config from YAML: %v", err)
+		}
 	}
 
-	if opts.KubeconfigFile != "" {
-		cfg.Kubernetes.Kubeconfig = opts.KubeconfigFile
-	}
-
-	if opts.EnabledCollectors != "" {
-		cfg.EnabledCollectors = opts.ParsedEnabledCollectors()
-	}
-
-	cfg.LeaderElection.Enabled = opts.LeaderElectionMode
-
-	// Override logging level
-	if opts.LogLevel != "" {
-		cfg.Logging.Level = opts.LogLevel
+	// Parse environment variables (will fill in any missing values)
+	if err := config.ParseEnv(cfg); err != nil {
+		ctx.Fatalf("Failed to parse environment variables: %v", err)
 	}
 
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "Configuration validation failed: %v\n", err)
-		os.Exit(1)
+		ctx.Fatalf("Configuration validation failed: %v", err)
 	}
 
 	// Initialize logger
@@ -67,15 +61,15 @@ func main() {
 	}).Info("Configuration loaded")
 
 	// Create and run server
-	ctx := context.Background()
+	appCtx := context.Background()
 
-	server, err := app.NewServer(cfg, opts.ConfigFile)
+	server, err := app.NewServer(cfg, cfg.ConfigFile)
 	if err != nil {
 		log.WithError(err).Error("Failed to create server")
 		os.Exit(1)
 	}
 
-	if err := server.Run(ctx); err != nil {
+	if err := server.Run(appCtx); err != nil {
 		log.WithError(err).Error("Server exited with error")
 		os.Exit(1)
 	}

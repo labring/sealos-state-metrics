@@ -12,6 +12,7 @@ import (
 	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 	"github.com/zijiren233/sealos-state-metric/pkg/config"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 var (
@@ -75,6 +76,7 @@ func MustRegister(name string, factory collector.Factory) {
 // It should be called once during application startup.
 func (r *Registry) Initialize(
 	ctx context.Context,
+	restConfig *rest.Config,
 	client kubernetes.Interface,
 	configContent []byte,
 	metricsNamespace string,
@@ -120,6 +122,7 @@ func (r *Registry) Initialize(
 		// Create FactoryContext with collector-specific logger
 		factoryCtx := &collector.FactoryContext{
 			Ctx:                  ctx,
+			RestConfig:           restConfig,
 			Client:               client,
 			ConfigLoader:         configLoader,
 			MetricsNamespace:     metricsNamespace,

@@ -14,33 +14,37 @@ type IPHealth struct {
 	IP     string // Specific IP address
 
 	// HTTP check
-	HTTPOk       bool
-	HTTPError    string
-	ResponseTime time.Duration
+	HTTPOk        bool
+	HTTPError     string
+	HTTPErrorType ErrorType // Classified error type
+	ResponseTime  time.Duration
 
 	// Certificate check
-	CertOk     bool
-	CertError  string
-	CertExpiry time.Duration
+	CertOk        bool
+	CertError     string
+	CertErrorType ErrorType // Classified error type
+	CertExpiry    time.Duration
 
 	LastChecked time.Time
 }
 
 // DomainChecker performs health checks on domains
 type DomainChecker struct {
-	timeout   time.Duration
-	checkHTTP bool
-	checkDNS  bool
-	checkCert bool
+	timeout    time.Duration
+	checkHTTP  bool
+	checkDNS   bool
+	checkCert  bool
+	classifier *ErrorClassifier
 }
 
 // NewDomainChecker creates a new domain checker
 func NewDomainChecker(timeout time.Duration, checkHTTP, checkDNS, checkCert bool) *DomainChecker {
 	return &DomainChecker{
-		timeout:   timeout,
-		checkHTTP: checkHTTP,
-		checkDNS:  checkDNS,
-		checkCert: checkCert,
+		timeout:    timeout,
+		checkHTTP:  checkHTTP,
+		checkDNS:   checkDNS,
+		checkCert:  checkCert,
+		classifier: NewErrorClassifier(),
 	}
 }
 
@@ -94,10 +98,18 @@ func (dc *DomainChecker) CheckIPs(
 			health.HTTPError = result.Error
 			health.ResponseTime = result.ResponseTime
 
+			// Classify HTTP error
+			if !health.HTTPOk && health.HTTPError != "" {
+				health.HTTPErrorType = dc.classifier.ClassifyHTTPError(health.HTTPError)
+			} else {
+				health.HTTPErrorType = ErrorTypeNone
+			}
+
 			logger.WithFields(log.Fields{
 				"domain":       domain,
 				"ip":           ip,
 				"success":      health.HTTPOk,
+				"errorType":    health.HTTPErrorType,
 				"responseTime": health.ResponseTime,
 			}).Debug("HTTP check completed")
 		}
@@ -107,12 +119,16 @@ func (dc *DomainChecker) CheckIPs(
 			if certErr != nil {
 				health.CertOk = false
 				health.CertError = certErr.Error()
+				health.CertErrorType = dc.classifier.ClassifyCertError(health.CertError)
 			} else {
 				health.CertOk = certInfo.IsValid
-
 				health.CertExpiry = certInfo.ExpiresIn
+
 				if !certInfo.IsValid {
 					health.CertError = "certificate expired or not yet valid"
+					health.CertErrorType = ErrorTypeCertExpired
+				} else {
+					health.CertErrorType = ErrorTypeNone
 				}
 			}
 
@@ -120,6 +136,7 @@ func (dc *DomainChecker) CheckIPs(
 				"domain":    domain,
 				"ip":        ip,
 				"success":   health.CertOk,
+				"errorType": health.CertErrorType,
 				"expiresIn": health.CertExpiry,
 			}).Debug("Certificate check completed")
 		}

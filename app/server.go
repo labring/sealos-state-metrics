@@ -56,7 +56,7 @@ func NewServer(cfg *config.GlobalConfig, configFile string) (*Server, error) {
 // Run starts the server and blocks until it receives a shutdown signal
 func (s *Server) Run(ctx context.Context) error {
 	// Create Kubernetes client
-	client, err := util.NewKubernetesClient(
+	restConfig, client, err := util.NewKubernetesClient(
 		s.config.Kubernetes.Kubeconfig,
 		s.config.Kubernetes.QPS,
 		s.config.Kubernetes.Burst,
@@ -68,6 +68,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// Initialize collectors
 	if err := s.registry.Initialize(
 		ctx,
+		restConfig,
 		client,
 		s.configContent,
 		s.config.Metrics.Namespace,

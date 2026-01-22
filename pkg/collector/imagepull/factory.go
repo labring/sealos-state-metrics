@@ -34,14 +34,15 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	c := &Collector{
 		BaseCollector: base.NewBaseCollector(
 			collectorName,
-			collector.TypeWatcher,
+			collector.TypeInformer,
 			factoryCtx.Logger,
 		),
 		client:     factoryCtx.Client,
 		config:     cfg,
 		classifier: NewFailureClassifier(),
-		pullInfo:   make(map[string]*ImagePullInfo),
-		pullEvents: make(map[string]time.Time),
+		failures:   make(map[string]*PullFailureInfo),
+		slowPulls:  make(map[string]*SlowPullInfo),
+		slowTimers: make(map[string]*time.Timer),
 		stopCh:     make(chan struct{}),
 		logger:     factoryCtx.Logger,
 	}
