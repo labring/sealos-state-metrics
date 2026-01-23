@@ -1,14 +1,13 @@
-{{- if and .Values.vmServiceScrape.enabled .Values.deploymentConfig.enabledCollectors }}
+{{- if and .Values.vmServiceScrape.enabled .Values.enabledCollectors }}
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMServiceScrape
 metadata:
-  name: {{ include "state-metrics.fullname" . }}-deployment
+  name: {{ include "state-metrics.fullname" . }}
   {{- if .Values.vmServiceScrape.namespace }}
   namespace: {{ .Values.vmServiceScrape.namespace }}
   {{- end }}
   labels:
     {{- include "state-metrics.labels" . | nindent 4 }}
-    app.kubernetes.io/component: deployment
     {{- with .Values.vmServiceScrape.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -16,41 +15,6 @@ spec:
   selector:
     matchLabels:
       {{- include "state-metrics.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: deployment
-  endpoints:
-    - port: http
-      path: {{ .Values.config.server.metricsPath }}
-      interval: {{ .Values.vmServiceScrape.interval }}
-      scrapeTimeout: {{ .Values.vmServiceScrape.scrapeTimeout }}
-      {{- with .Values.vmServiceScrape.relabelConfigs }}
-      relabelConfigs:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.vmServiceScrape.metricRelabelConfigs }}
-      metricRelabelConfigs:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-{{- end }}
----
-{{- if and .Values.vmServiceScrape.enabled .Values.daemonsetConfig.enabledCollectors }}
-apiVersion: operator.victoriametrics.com/v1beta1
-kind: VMServiceScrape
-metadata:
-  name: {{ include "state-metrics.fullname" . }}-daemonset
-  {{- if .Values.vmServiceScrape.namespace }}
-  namespace: {{ .Values.vmServiceScrape.namespace }}
-  {{- end }}
-  labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
-    app.kubernetes.io/component: daemonset
-    {{- with .Values.vmServiceScrape.labels }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-spec:
-  selector:
-    matchLabels:
-      {{- include "state-metrics.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: daemonset
   endpoints:
     - port: http
       path: {{ .Values.config.server.metricsPath }}

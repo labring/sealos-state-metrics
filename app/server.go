@@ -105,7 +105,7 @@ func (s *Server) Init(ctx context.Context) error {
 
 	// Register collectors with Prometheus wrapped by ReloadAwareCollector
 	// This ensures metrics collection is blocked during reload operations
-	innerCollector := registry.NewPrometheusCollector(s.registry)
+	innerCollector := registry.NewPrometheusCollector(s.registry, s.config.Metrics.Namespace)
 	wrappedCollector := &ReloadAwareCollector{
 		server: s,
 		inner:  innerCollector,
@@ -149,9 +149,13 @@ func (s *Server) buildInitConfig() *registry.InitConfig {
 // buildLeaderElectionConfig creates leaderelection.Config from current server state
 func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
 	return &leaderelection.Config{
-		Namespace:     s.config.LeaderElection.Namespace,
-		LeaseName:     s.config.LeaderElection.LeaseName,
-		Identity:      identity.GetWithConfig(s.config.Identity, s.config.NodeName, s.config.PodName),
+		Namespace: s.config.LeaderElection.Namespace,
+		LeaseName: s.config.LeaderElection.LeaseName,
+		Identity: identity.GetWithConfig(
+			s.config.Identity,
+			s.config.NodeName,
+			s.config.PodName,
+		),
 		LeaseDuration: s.config.LeaderElection.LeaseDuration,
 		RenewDeadline: s.config.LeaderElection.RenewDeadline,
 		RetryPeriod:   s.config.LeaderElection.RetryPeriod,

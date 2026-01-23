@@ -2,33 +2,31 @@ Thank you for installing {{ .Chart.Name }}!
 
 Your release is named {{ .Release.Name }}.
 
-Enabled collectors: {{ .Values.config.enabledCollectors | join ", " }}
+Enabled collectors: {{ .Values.enabledCollectors | join ", " }}
 
-Deployment mode:
-{{- $deploymentEnabled := eq (include "state-metrics.deploymentEnabled" .) "true" }}
-{{- $daemonsetEnabled := eq (include "state-metrics.daemonsetEnabled" .) "true" }}
-{{- if and $deploymentEnabled $daemonsetEnabled }}
-  - Deployment (leader election collectors): {{ include "state-metrics.deploymentCollectors" . }}
-  - DaemonSet (node-level collectors): {{ include "state-metrics.daemonsetCollectors" . }}
-{{- else if $deploymentEnabled }}
-  - Deployment only: {{ include "state-metrics.deploymentCollectors" . }}
-{{- else if $daemonsetEnabled }}
-  - DaemonSet only: {{ include "state-metrics.daemonsetCollectors" . }}
-{{- else }}
-  - No collectors enabled!
-{{- end }}
+Deployment mode: DaemonSet
 
 To get the status of your deployment:
-{{- if $deploymentEnabled }}
-  kubectl get deployment {{ include "state-metrics.fullname" . }}-deployment -n {{ .Release.Namespace }}
-{{- end }}
-{{- if $daemonsetEnabled }}
-  kubectl get daemonset {{ include "state-metrics.fullname" . }}-daemonset -n {{ .Release.Namespace }}
-{{- end }}
+  kubectl get daemonset {{ include "state-metrics.fullname" . }} -n {{ .Release.Namespace }}
 
-To access the metrics endpoint:
+To view the pods:
+  kubectl get pods -l app.kubernetes.io/name={{ include "state-metrics.name" . }} -n {{ .Release.Namespace }}
+
+To access the metrics endpoint from a specific node:
+  kubectl port-forward -n {{ .Release.Namespace }} <pod-name> {{ .Values.service.port }}:{{ .Values.service.port }}
+
+Or use the service:
   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "state-metrics.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
 
 Then visit http://localhost:{{ .Values.service.port }}/metrics in your browser.
 
-For more information, visit: https://github.com/zijiren233/sealos-state-metric
+Configuration:
+{{- if .Values.leaderElection.enabled }}
+  - Leader election: enabled (lease: {{ .Values.leaderElection.leaseName }})
+{{- else }}
+  - Leader election: disabled
+{{- end }}
+  - Metrics namespace: {{ .Values.config.metrics.namespace | default "(none)" }}
+  - Log level: {{ .Values.config.logging.level }}
+
+For more information, visit: https://github.com/labring/sealos-state-metric

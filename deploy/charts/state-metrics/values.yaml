@@ -38,7 +38,7 @@ vmServiceScrape:
   metricRelabelConfigs: []
   relabelConfigs: []
 
-# Common application configuration (shared by both Deployment and DaemonSet)
+# Application configuration
 config:
   server:
     address: ":9090"
@@ -61,136 +61,83 @@ config:
   performance:
     informerResyncPeriod: "10m"
 
-# Deployment configuration (for collectors requiring leader election)
-deploymentConfig:
-  replicaCount: 1
+# Leader election configuration
+leaderElection:
+  enabled: true
+  namespace: ""
+  leaseName: "state-metrics"
+  leaseDuration: "15s"
+  renewDeadline: "10s"
+  retryPeriod: "2s"
 
-  # Leader election configuration (Deployment only)
-  leaderElection:
-    enabled: true
-    namespace: ""
-    leaseName: "state-metrics"
-    leaseDuration: "15s"
-    renewDeadline: "10s"
-    retryPeriod: "2s"
+# Enabled collectors
+# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm]
+enabledCollectors:
+  - lvm
 
-  # Collectors configuration
-  enabledCollectors:
-    - domain
-    - node
+# Instance identity (optional, defaults to NODE_NAME > POD_NAME > auto-detected)
+identity: ""
 
-  identity: ""
+# Collectors configuration
+collectors:
+  domain:
+    domains: []
+    checkTimeout: "5s"
+    checkInterval: "5m"
+    includeCertCheck: true
+    includeHTTPCheck: true
 
-  collectors:
-    domain:
-      domains: []
-      checkTimeout: "5s"
-      checkInterval: "5m"
-      includeCertCheck: true
-      includeHTTPCheck: true
+  node: {}
 
-    node: {}
+  imagepull:
+    slowPullThreshold: "5m"
 
-    pod:
-      restartThreshold: 5
+  zombie:
+    checkInterval: "30s"
 
-    imagepull:
-      slowPullThreshold: "5m"
+  cloudbalance:
+    checkInterval: "5m"
+    accounts: []
 
-    zombie:
-      checkInterval: "30s"
+  lvm:
+    updateInterval: "10s"
 
-    cloudbalance:
-      checkInterval: "5m"
-      accounts: []
+# Pod configuration
+podAnnotations: {}
+podSecurityContext: {}
+securityContext:
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
 
-  # Pod configuration
-  podAnnotations: {}
-  podSecurityContext: {}
-  securityContext:
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 65532
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
 
-  resources:
-    limits:
-      cpu: 1000m
-      memory: 512Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
 
-  livenessProbe:
-    httpGet:
-      path: /health
-      port: http
-    initialDelaySeconds: 15
-    periodSeconds: 20
-    timeoutSeconds: 5
-    failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
-  readinessProbe:
-    httpGet:
-      path: /health
-      port: http
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  priorityClassName: ""
-
-# DaemonSet configuration (for node-level collectors like LVM)
-daemonsetConfig:
-  # Collectors configuration
-  # Set enabledCollectors to enable DaemonSet deployment (e.g., [lvm])
-  enabledCollectors: []
-
-  identity: ""
-
-  collectors:
-    lvm:
-      updateInterval: "10s"
-
-  # Pod configuration
-  podAnnotations: {}
-  podSecurityContext: {}
-  securityContext:
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    runAsUser: 65532
-
-  resources:
-    limits:
-      cpu: 500m
-      memory: 256Mi
-    requests:
-      cpu: 50m
-      memory: 64Mi
-
-  livenessProbe:
-    httpGet:
-      path: /health
-      port: http
-    initialDelaySeconds: 15
-    periodSeconds: 20
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  readinessProbe:
-    httpGet:
-      path: /health
-      port: http
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  nodeSelector: {}
-  tolerations:
-    - operator: Exists
-  affinity: {}
-  priorityClassName: ""
+nodeSelector: {}
+tolerations:
+  - operator: Exists
+affinity: {}
+priorityClassName: ""

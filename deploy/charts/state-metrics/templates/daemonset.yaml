@@ -1,26 +1,23 @@
-{{- if .Values.daemonsetConfig.enabledCollectors }}
+{{- if .Values.enabledCollectors }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "state-metrics.fullname" . }}-daemonset
+  name: {{ include "state-metrics.fullname" . }}
   labels:
     {{- include "state-metrics.labels" . | nindent 4 }}
-    app.kubernetes.io/component: daemonset
 spec:
   selector:
     matchLabels:
       {{- include "state-metrics.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: daemonset
   template:
     metadata:
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap-daemonset.yaml") . | sha256sum }}
-        {{- with .Values.daemonsetConfig.podAnnotations }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "state-metrics.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: daemonset
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -28,18 +25,18 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "state-metrics.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.daemonsetConfig.podSecurityContext | nindent 8 }}
-      {{- with .Values.daemonsetConfig.priorityClassName }}
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
-          {{- if has "lvm" .Values.daemonsetConfig.enabledCollectors }}
+          {{- if has "lvm" .Values.enabledCollectors }}
           securityContext:
             privileged: true
           {{- else }}
           securityContext:
-            {{- toYaml .Values.daemonsetConfig.securityContext | nindent 12 }}
+            {{- toYaml .Values.securityContext | nindent 12 }}
           {{- end }}
           image: {{ include "state-metrics.image" . }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -64,12 +61,12 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: LEADER_ELECTION_LEASE_NAME
-              value: {{ include "state-metrics.fullname" . }}-daemonset
+              value: {{ include "state-metrics.fullname" . }}
           volumeMounts:
             - name: config
               mountPath: /config
               readOnly: true
-            {{- if has "lvm" .Values.daemonsetConfig.enabledCollectors }}
+            {{- if has "lvm" .Values.enabledCollectors }}
             - name: dev
               mountPath: /dev
             - name: lvm-config
@@ -79,16 +76,16 @@ spec:
               mountPropagation: Bidirectional
             {{- end }}
           livenessProbe:
-            {{- toYaml .Values.daemonsetConfig.livenessProbe | nindent 12 }}
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:
-            {{- toYaml .Values.daemonsetConfig.readinessProbe | nindent 12 }}
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
-            {{- toYaml .Values.daemonsetConfig.resources | nindent 12 }}
+            {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
-            name: {{ include "state-metrics.fullname" . }}-daemonset
-        {{- if has "lvm" .Values.daemonsetConfig.enabledCollectors }}
+            name: {{ include "state-metrics.fullname" . }}
+        {{- if has "lvm" .Values.enabledCollectors }}
         - name: dev
           hostPath:
             path: /dev
@@ -100,15 +97,15 @@ spec:
             path: /var/lib/kubelet
             type: Directory
         {{- end }}
-      {{- with .Values.daemonsetConfig.nodeSelector }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.daemonsetConfig.affinity }}
+      {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.daemonsetConfig.tolerations }}
+      {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}

@@ -1,23 +1,22 @@
-{{- if .Values.deploymentConfig.enabledCollectors }}
+{{- if .Values.enabledCollectors }}
 {{- $appConfig := dict -}}
 {{- $_ := set $appConfig "server" .Values.config.server -}}
 {{- $_ := set $appConfig "kubernetes" .Values.config.kubernetes -}}
 {{- $_ := set $appConfig "metrics" .Values.config.metrics -}}
 {{- $_ := set $appConfig "logging" .Values.config.logging -}}
 {{- $_ := set $appConfig "performance" .Values.config.performance -}}
-{{- $_ := set $appConfig "leaderElection" .Values.deploymentConfig.leaderElection -}}
-{{- $_ := set $appConfig "enabledCollectors" .Values.deploymentConfig.enabledCollectors -}}
-{{- if .Values.deploymentConfig.identity }}
-{{- $_ := set $appConfig "identity" .Values.deploymentConfig.identity -}}
+{{- $_ := set $appConfig "leaderElection" .Values.leaderElection -}}
+{{- $_ := set $appConfig "enabledCollectors" .Values.enabledCollectors -}}
+{{- if .Values.identity }}
+{{- $_ := set $appConfig "identity" .Values.identity -}}
 {{- end }}
-{{- $_ := set $appConfig "collectors" .Values.deploymentConfig.collectors -}}
+{{- $_ := set $appConfig "collectors" .Values.collectors -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "state-metrics.fullname" . }}-deployment
+  name: {{ include "state-metrics.fullname" . }}
   labels:
     {{- include "state-metrics.labels" . | nindent 4 }}
-    app.kubernetes.io/component: deployment
 data:
   config.yaml: |
     {{- $appConfig | toYaml | nindent 4 }}

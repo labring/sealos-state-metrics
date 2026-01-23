@@ -28,17 +28,17 @@ type PrometheusCollector struct {
 }
 
 // NewPrometheusCollector creates a new PrometheusCollector
-func NewPrometheusCollector(registry *Registry) *PrometheusCollector {
+func NewPrometheusCollector(registry *Registry, namespace string) *PrometheusCollector {
 	return &PrometheusCollector{
 		registry: registry,
 		collectorDuration: prometheus.NewDesc(
-			"sealos_state_metric_collector_duration_seconds",
+			prometheus.BuildFQName(namespace, "state_metric", "collector_duration_seconds"),
 			"Duration of collector scrape in seconds",
 			[]string{"collector", "instance"},
 			nil,
 		),
 		collectorSuccess: prometheus.NewDesc(
-			"sealos_state_metric_collector_success",
+			prometheus.BuildFQName(namespace, "state_metric", "collector_success"),
 			"Whether collector scrape was successful (1=success, 0=failure)",
 			[]string{"collector", "instance"},
 			nil,
