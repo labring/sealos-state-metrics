@@ -11,6 +11,7 @@ type Lifecycle interface {
 	OnStart(ctx context.Context) error
 	OnStop() error
 	OnCollect(ch chan<- prometheus.Metric)
+	OnHealth() error
 }
 
 var _ Lifecycle = (*LifecycleFuncs)(nil)
@@ -20,6 +21,7 @@ type LifecycleFuncs struct {
 	StartFunc   func(ctx context.Context) error
 	StopFunc    func() error
 	CollectFunc func(ch chan<- prometheus.Metric)
+	HealthFunc  func() error
 }
 
 // OnStart calls StartFunc if set
@@ -43,4 +45,12 @@ func (lf LifecycleFuncs) OnCollect(ch chan<- prometheus.Metric) {
 	if lf.CollectFunc != nil {
 		lf.CollectFunc(ch)
 	}
+}
+
+// OnHealth calls HealthFunc if set
+func (lf LifecycleFuncs) OnHealth() error {
+	if lf.HealthFunc != nil {
+		return lf.HealthFunc()
+	}
+	return nil
 }

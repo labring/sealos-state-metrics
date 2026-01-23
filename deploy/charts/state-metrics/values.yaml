@@ -64,7 +64,6 @@ config:
 # Leader election configuration
 leaderElection:
   enabled: true
-  namespace: ""
   leaseName: "state-metrics"
   leaseDuration: "15s"
   renewDeadline: "10s"

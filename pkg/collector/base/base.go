@@ -281,18 +281,28 @@ func (b *BaseCollector) Health() error {
 	}
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	ctx := b.ctx
+	lifecycle := b.lifecycle
+	b.mu.RUnlock()
 
-	if b.ctx == nil {
+	if ctx == nil {
 		return fmt.Errorf("collector %s has nil context", b.name)
 	}
 
 	select {
-	case <-b.ctx.Done():
+	case <-ctx.Done():
 		return fmt.Errorf("collector %s context cancelled", b.name)
 	default:
-		return nil
 	}
+
+	// Call lifecycle health check if available
+	if lifecycle != nil {
+		if err := lifecycle.OnHealth(); err != nil {
+			return fmt.Errorf("collector %s health check failed: %w", b.name, err)
+		}
+	}
+
+	return nil
 }
 
 // RegisterDesc registers a prometheus descriptor

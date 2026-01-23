@@ -433,13 +433,42 @@ func (s *Server) setupRoutes(mux *http.ServeMux) {
 
 // handleHealth handles health check requests
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	healthStatus := s.registry.HealthCheck()
+	// Get all collectors
+	allCollectors := s.registry.GetAllCollectors()
 
+	// Determine which collectors should be checked based on leader election state
+	healthStatus := make(map[string]error)
 	allHealthy := true
-	for _, err := range healthStatus {
-		if err != nil {
-			allHealthy = false
-			break
+
+	for name, c := range allCollectors {
+		// Determine if this collector should be checked
+		var shouldCheck bool
+
+		if !s.config.LeaderElection.Enabled {
+			// Leader election disabled: all collectors should be running
+			shouldCheck = true
+		} else {
+			// Leader election enabled
+			if c.RequiresLeaderElection() {
+				// Leader-required collector: only check if we are the leader
+				s.leMu.Lock()
+				isLeader := s.leaderElector != nil && s.leaderElector.IsLeader()
+				s.leMu.Unlock()
+
+				shouldCheck = isLeader
+			} else {
+				// Non-leader collector: always check (should always be running)
+				shouldCheck = true
+			}
+		}
+
+		if shouldCheck {
+			err := c.Health()
+
+			healthStatus[name] = err
+			if err != nil {
+				allHealthy = false
+			}
 		}
 	}
 

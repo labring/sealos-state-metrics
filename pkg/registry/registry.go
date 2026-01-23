@@ -390,15 +390,11 @@ func (r *Registry) ListCollectors() []string {
 	return names
 }
 
-// HealthCheck performs health checks on all collectors
-func (r *Registry) HealthCheck() map[string]error {
+// GetAllCollectors returns the internal collectors map
+// Note: Caller should not modify the returned map
+func (r *Registry) GetAllCollectors() map[string]collector.Collector {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	results := make(map[string]error)
-	for name, c := range r.collectors {
-		results[name] = c.Health()
-	}
-
-	return results
+	return r.collectors
 }
