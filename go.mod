@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_model v0.6.1
 	github.com/sirupsen/logrus v1.9.4
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/billing v1.3.34
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.36
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.37
 	github.com/volcengine/volcengine-go-sdk v1.2.8
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.1
