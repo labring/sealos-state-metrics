@@ -24,6 +24,9 @@ type GlobalConfig struct {
 	// Server configuration
 	Server ServerConfig `yaml:"server" embed:"" prefix:"server-" envprefix:"SERVER_"`
 
+	// Debug server configuration (hot-reloadable, no auth)
+	DebugServer DebugServerConfig `yaml:"debugServer" embed:"" prefix:"debug-server-" envprefix:"DEBUG_SERVER_"`
+
 	// Kubernetes client configuration
 	Kubernetes KubernetesConfig `yaml:"kubernetes" embed:"" prefix:"" envprefix:"KUBERNETES_"`
 
@@ -54,7 +57,9 @@ type GlobalConfig struct {
 
 // ApplyHotReload applies hot-reloadable fields from newConfig
 // Note: Server and Logging configs require restart and are not updated
+// DebugServer config is hot-reloadable
 func (c *GlobalConfig) ApplyHotReload(newConfig *GlobalConfig) {
+	c.DebugServer = newConfig.DebugServer
 	c.Kubernetes = newConfig.Kubernetes
 	c.Metrics = newConfig.Metrics
 	c.LeaderElection = newConfig.LeaderElection
@@ -67,9 +72,61 @@ func (c *GlobalConfig) ApplyHotReload(newConfig *GlobalConfig) {
 
 // ServerConfig contains HTTP server configuration
 type ServerConfig struct {
-	Address     string `yaml:"address"     name:"address"      env:"ADDRESS"      default:":9090"    help:"Server listen address"`
-	MetricsPath string `yaml:"metricsPath" name:"metrics-path" env:"METRICS_PATH" default:"/metrics" help:"Metrics endpoint path"`
-	HealthPath  string `yaml:"healthPath"  name:"health-path"  env:"HEALTH_PATH"  default:"/health"  help:"Health check endpoint path"`
+	Address     string     `yaml:"address"     name:"address"      env:"ADDRESS"      default:":9090"    help:"Server listen address"`
+	MetricsPath string     `yaml:"metricsPath" name:"metrics-path" env:"METRICS_PATH" default:"/metrics" help:"Metrics endpoint path"`
+	HealthPath  string     `yaml:"healthPath"  name:"health-path"  env:"HEALTH_PATH"  default:"/health"  help:"Health check endpoint path"`
+	TLS         TLSConfig  `yaml:"tls"                                                                                                     embed:"" prefix:"tls-"  envprefix:"TLS_"`
+	Auth        AuthConfig `yaml:"auth"                                                                                                    embed:"" prefix:"auth-" envprefix:"AUTH_"`
+}
+
+// Equal checks if two ServerConfig are equal
+func (c ServerConfig) Equal(other ServerConfig) bool {
+	return c.Address == other.Address &&
+		c.MetricsPath == other.MetricsPath &&
+		c.HealthPath == other.HealthPath &&
+		c.TLS.Equal(other.TLS) &&
+		c.Auth.Equal(other.Auth)
+}
+
+// TLSConfig contains TLS configuration for the HTTP server
+type TLSConfig struct {
+	Enabled  bool   `yaml:"enabled"  name:"enabled"   env:"ENABLED"   default:"false"            help:"Enable TLS for the metrics server"`
+	CertFile string `yaml:"certFile" name:"cert-file" env:"CERT_FILE" default:"/etc/tls/tls.crt" help:"Path to TLS certificate file"      type:"path"`
+	KeyFile  string `yaml:"keyFile"  name:"key-file"  env:"KEY_FILE"  default:"/etc/tls/tls.key" help:"Path to TLS private key file"      type:"path"`
+}
+
+// Equal checks if two TLSConfig are equal
+func (c TLSConfig) Equal(other TLSConfig) bool {
+	return c.Enabled == other.Enabled &&
+		c.CertFile == other.CertFile &&
+		c.KeyFile == other.KeyFile
+}
+
+// AuthConfig contains authentication configuration for the metrics endpoint
+type AuthConfig struct {
+	Enabled bool `yaml:"enabled" name:"enabled" env:"ENABLED" default:"false" help:"Enable Kubernetes authentication for metrics endpoint"`
+}
+
+// Equal checks if two AuthConfig are equal
+func (c AuthConfig) Equal(other AuthConfig) bool {
+	return c.Enabled == other.Enabled
+}
+
+// DebugServerConfig contains debug server configuration for internal access without authentication
+// This config is hot-reloadable
+type DebugServerConfig struct {
+	Enabled     bool   `yaml:"enabled"     name:"enabled"      env:"ENABLED"      default:"true"     help:"Enable debug server for internal access (no auth)"`
+	Address     string `yaml:"address"     name:"address"      env:"ADDRESS"      default:":8080"    help:"Debug server listen address"`
+	MetricsPath string `yaml:"metricsPath" name:"metrics-path" env:"METRICS_PATH" default:"/metrics" help:"Metrics endpoint path for debug server"`
+	HealthPath  string `yaml:"healthPath"  name:"health-path"  env:"HEALTH_PATH"  default:"/health"  help:"Health check endpoint path for debug server"`
+}
+
+// Equal checks if two DebugServerConfig are equal
+func (c DebugServerConfig) Equal(other DebugServerConfig) bool {
+	return c.Enabled == other.Enabled &&
+		c.Address == other.Address &&
+		c.MetricsPath == other.MetricsPath &&
+		c.HealthPath == other.HealthPath
 }
 
 // KubernetesConfig contains Kubernetes client configuration

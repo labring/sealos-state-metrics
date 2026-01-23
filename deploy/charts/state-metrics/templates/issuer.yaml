@@ -1,0 +1,10 @@
+{{- if and .Values.enabledCollectors .Values.tls.enabled (not .Values.tls.issuer) }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "state-metrics.fullname" . }}-selfsigned
+  labels:
+    {{- include "state-metrics.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}

@@ -20,6 +20,21 @@ spec:
       path: {{ .Values.config.server.metricsPath }}
       interval: {{ .Values.vmServiceScrape.interval }}
       scrapeTimeout: {{ .Values.vmServiceScrape.scrapeTimeout }}
+      {{- if .Values.tls.enabled }}
+      scheme: https
+      tlsConfig:
+        {{- if .Values.tls.insecureSkipVerify }}
+        insecureSkipVerify: true
+        {{- else }}
+        ca:
+          secret:
+            name: {{ include "state-metrics.fullname" . }}-tls
+            key: ca.crt
+        {{- end }}
+      {{- end }}
+      {{- if .Values.auth.enabled }}
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      {{- end }}
       {{- with .Values.vmServiceScrape.relabelConfigs }}
       relabelConfigs:
         {{- toYaml . | nindent 8 }}

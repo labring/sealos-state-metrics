@@ -1,6 +1,7 @@
 {{- if .Values.enabledCollectors }}
 {{- $appConfig := dict -}}
 {{- $_ := set $appConfig "server" .Values.config.server -}}
+{{- $_ := set $appConfig "debugServer" .Values.config.debugServer -}}
 {{- $_ := set $appConfig "kubernetes" .Values.config.kubernetes -}}
 {{- $_ := set $appConfig "metrics" .Values.config.metrics -}}
 {{- $_ := set $appConfig "logging" .Values.config.logging -}}

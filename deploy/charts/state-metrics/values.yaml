@@ -20,6 +20,48 @@ service:
   targetPort: 9090
   annotations: {}
 
+# TLS configuration for metrics endpoint
+tls:
+  enabled: true
+  # Certificate duration (default: 90 days)
+  duration: 2160h
+  # Renew certificate before expiration (default: 30 days)
+  renewBefore: 720h
+  # Organization name in certificate
+  organization: "sealos"
+  # Name of existing cert-manager Issuer or ClusterIssuer
+  # If not specified, a self-signed Issuer will be created
+  issuer: ""
+  # Kind of issuer (Issuer or ClusterIssuer)
+  issuerKind: "Issuer"
+  # Skip TLS verification in ServiceMonitor/VMServiceScrape (not recommended for production)
+  insecureSkipVerify: false
+
+# Authentication configuration for metrics endpoint
+auth:
+  enabled: true
+  # List of ServiceAccounts allowed to access metrics
+  # When auth is enabled, only these ServiceAccounts can scrape metrics
+  allowedServiceAccounts:
+    # Prometheus Operator default ServiceAccount
+    - name: prometheus
+      namespace: monitoring
+    # Prometheus Operator kube-prometheus-stack default
+    - name: prometheus-kube-prometheus-prometheus
+      namespace: monitoring
+    # VictoriaMetrics Operator k8s-stack (vm namespace)
+    - name: vmagent-victoria-metrics-k8s-stack
+      namespace: vm
+    - name: vmalert-victoria-metrics-k8s-stack
+      namespace: vm
+    - name: vmcluster-victoria-metrics-k8s-stack
+      namespace: vm
+    - name: victoria-metrics-k8s-stack
+      namespace: vm
+    # Add custom ServiceAccounts below
+    # - name: custom-prometheus
+    #   namespace: custom-namespace
+
 serviceMonitor:
   enabled: false
   namespace: ""
@@ -42,6 +84,13 @@ vmServiceScrape:
 config:
   server:
     address: ":9090"
+    metricsPath: "/metrics"
+    healthPath: "/health"
+
+  # Debug server configuration (hot-reloadable, no authentication)
+  debugServer:
+    enabled: true
+    address: ":8080"
     metricsPath: "/metrics"
     healthPath: "/health"
 

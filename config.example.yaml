@@ -6,6 +6,15 @@ server:
   address: ":9090"
   metricsPath: "/metrics"
   healthPath: "/health"
+  # TLS configuration (usually injected via environment variables in Kubernetes)
+  tls:
+    enabled: false
+    certFile: "/etc/tls/tls.crt"
+    keyFile: "/etc/tls/tls.key"
+  # Authentication configuration
+  # When enabled, requires Kubernetes ServiceAccount token to access metrics
+  auth:
+    enabled: false
 
 # Kubernetes client configuration
 kubernetes:

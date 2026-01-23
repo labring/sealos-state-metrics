@@ -47,6 +47,11 @@ spec:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
+            {{- if .Values.config.debugServer.enabled }}
+            - name: debug
+              containerPort: 8080
+              protocol: TCP
+            {{- end }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -62,10 +67,27 @@ spec:
                   fieldPath: metadata.namespace
             - name: LEADER_ELECTION_LEASE_NAME
               value: {{ include "state-metrics.fullname" . }}
+            {{- if .Values.tls.enabled }}
+            - name: SERVER_TLS_ENABLED
+              value: "true"
+            - name: SERVER_TLS_CERT_FILE
+              value: "/etc/tls/tls.crt"
+            - name: SERVER_TLS_KEY_FILE
+              value: "/etc/tls/tls.key"
+            {{- end }}
+            {{- if .Values.auth.enabled }}
+            - name: SERVER_AUTH_ENABLED
+              value: "true"
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /config
               readOnly: true
+            {{- if .Values.tls.enabled }}
+            - name: tls
+              mountPath: /etc/tls
+              readOnly: true
+            {{- end }}
             {{- if has "lvm" .Values.enabledCollectors }}
             - name: dev
               mountPath: /dev
@@ -76,15 +98,47 @@ spec:
               mountPropagation: Bidirectional
             {{- end }}
           livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              {{- if .Values.config.debugServer.enabled }}
+              port: debug
+              {{- else }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+              {{- if .Values.tls.enabled }}
+              scheme: HTTPS
+              {{- end }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              {{- if .Values.config.debugServer.enabled }}
+              port: debug
+              {{- else }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+              {{- if .Values.tls.enabled }}
+              scheme: HTTPS
+              {{- end }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "state-metrics.fullname" . }}
+        {{- if .Values.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ include "state-metrics.fullname" . }}-tls
+            defaultMode: 0400
+        {{- end }}
         {{- if has "lvm" .Values.enabledCollectors }}
         - name: dev
           hostPath:
