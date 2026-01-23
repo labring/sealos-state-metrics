@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/zijiren233/sealos-state-metric/pkg/config"
+	"github.com/zijiren233/sealos-state-metric/pkg/identity"
 	"github.com/zijiren233/sealos-state-metric/pkg/leaderelection"
 	"github.com/zijiren233/sealos-state-metric/pkg/registry"
 	"github.com/zijiren233/sealos-state-metric/pkg/util"
@@ -150,7 +151,7 @@ func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
 	return &leaderelection.Config{
 		Namespace:     s.config.LeaderElection.Namespace,
 		LeaseName:     s.config.LeaderElection.LeaseName,
-		Identity:      s.config.Identity,
+		Identity:      identity.GetWithConfig(s.config.Identity, s.config.NodeName, s.config.PodName),
 		LeaseDuration: s.config.LeaderElection.LeaseDuration,
 		RenewDeadline: s.config.LeaderElection.RenewDeadline,
 		RetryPeriod:   s.config.LeaderElection.RetryPeriod,

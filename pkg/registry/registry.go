@@ -163,7 +163,7 @@ func (r *Registry) createCollectors(cfg *InitConfig, action string) {
 			RestConfig:           cfg.RestConfig,
 			Client:               cfg.Client,
 			ConfigLoader:         configLoader,
-			Identity:             cfg.Identity,
+			Identity:             r.instance,
 			NodeName:             cfg.NodeName,
 			PodName:              cfg.PodName,
 			MetricsNamespace:     cfg.MetricsNamespace,
