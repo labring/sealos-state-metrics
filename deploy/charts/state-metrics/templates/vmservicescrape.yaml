@@ -16,7 +16,7 @@ spec:
     matchLabels:
       {{- include "state-metrics.selectorLabels" . | nindent 6 }}
   endpoints:
-    - port: http
+    - port: server
       path: {{ .Values.config.server.metricsPath }}
       interval: {{ .Values.vmServiceScrape.interval }}
       scrapeTimeout: {{ .Values.vmServiceScrape.scrapeTimeout }}

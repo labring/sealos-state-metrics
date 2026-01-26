@@ -44,7 +44,7 @@ spec:
             - -c
             - /config/config.yaml
           ports:
-            - name: http
+            - name: server
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
             {{- if .Values.config.debugServer.enabled }}
@@ -106,13 +106,9 @@ spec:
           livenessProbe:
             httpGet:
               path: {{ .Values.livenessProbe.httpGet.path }}
-              {{- if .Values.config.debugServer.enabled }}
-              port: debug
-              {{- else }}
               port: {{ .Values.livenessProbe.httpGet.port }}
               {{- if .Values.tls.enabled }}
               scheme: HTTPS
-              {{- end }}
               {{- end }}
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
@@ -121,13 +117,9 @@ spec:
           readinessProbe:
             httpGet:
               path: {{ .Values.readinessProbe.httpGet.path }}
-              {{- if .Values.config.debugServer.enabled }}
-              port: debug
-              {{- else }}
               port: {{ .Values.readinessProbe.httpGet.port }}
               {{- if .Values.tls.enabled }}
               scheme: HTTPS
-              {{- end }}
               {{- end }}
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
