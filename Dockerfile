@@ -1,5 +1,7 @@
 FROM golang:1.25-alpine AS builder
 
+ENV CGO_ENABLED=0
+
 WORKDIR /workspace
 
 # Install build dependencies
@@ -13,7 +15,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /state-metrics .
+RUN go build -trimpath -ldflags "-s -w" -o /sealos-state-metrics .
 
 # Final image with LVM tools
 FROM alpine:3.18.4
@@ -35,7 +37,7 @@ RUN apk add --no-cache \
 WORKDIR /
 
 # Copy binary from builder
-COPY --from=builder /state-metrics /state-metrics
+COPY --from=builder /sealos-state-metrics /sealos-state-metrics
 
 # Expose metrics port
 EXPOSE 9090
@@ -43,4 +45,4 @@ EXPOSE 9090
 # Run as root for LVM operations
 USER 0
 
-ENTRYPOINT ["/state-metrics"]
+ENTRYPOINT ["/sealos-state-metrics"]

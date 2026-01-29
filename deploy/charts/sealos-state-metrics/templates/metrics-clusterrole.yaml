@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "state-metrics.fullname" . }}-metrics-reader
+  name: {{ include "sealos-state-metrics.fullname" . }}-metrics-reader
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 rules:
 - nonResourceURLs:
   - {{ .Values.config.server.metricsPath | quote }}

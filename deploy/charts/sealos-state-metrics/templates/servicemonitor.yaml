@@ -2,19 +2,19 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "state-metrics.fullname" . }}
+  name: {{ include "sealos-state-metrics.fullname" . }}
   {{- if .Values.serviceMonitor.namespace }}
   namespace: {{ .Values.serviceMonitor.namespace }}
   {{- end }}
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "state-metrics.selectorLabels" . | nindent 6 }}
+      {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: server
       path: {{ .Values.config.server.metricsPath }}
@@ -26,8 +26,8 @@ spec:
         {{- if .Values.tls.insecureSkipVerify }}
         insecureSkipVerify: true
         {{- else }}
-        caFile: /etc/prometheus/secrets/{{ include "state-metrics.fullname" . }}-tls/ca.crt
-        serverName: {{ include "state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+        caFile: /etc/prometheus/secrets/{{ include "sealos-state-metrics.fullname" . }}-tls/ca.crt
+        serverName: {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
         {{- end }}
       {{- end }}
       {{- if .Values.auth.enabled }}

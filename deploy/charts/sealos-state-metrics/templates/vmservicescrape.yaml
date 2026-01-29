@@ -2,19 +2,19 @@
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMServiceScrape
 metadata:
-  name: {{ include "state-metrics.fullname" . }}
+  name: {{ include "sealos-state-metrics.fullname" . }}
   {{- if .Values.vmServiceScrape.namespace }}
   namespace: {{ .Values.vmServiceScrape.namespace }}
   {{- end }}
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
     {{- with .Values.vmServiceScrape.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "state-metrics.selectorLabels" . | nindent 6 }}
+      {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: server
       path: {{ .Values.config.server.metricsPath }}
@@ -28,9 +28,9 @@ spec:
         {{- else }}
         ca:
           secret:
-            name: {{ include "state-metrics.fullname" . }}-tls
+            name: {{ include "sealos-state-metrics.fullname" . }}-tls
             key: ca.crt
-        serverName: {{ include "state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+        serverName: {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
         {{- end }}
       {{- end }}
       {{- if .Values.auth.enabled }}

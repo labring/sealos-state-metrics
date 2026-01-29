@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "state-metrics.name" -}}
+{{- define "sealos-state-metrics.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "state-metrics.fullname" -}}
+{{- define "sealos-state-metrics.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "state-metrics.chart" -}}
+{{- define "sealos-state-metrics.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "state-metrics.labels" -}}
-helm.sh/chart: {{ include "state-metrics.chart" . }}
-{{ include "state-metrics.selectorLabels" . }}
+{{- define "sealos-state-metrics.labels" -}}
+helm.sh/chart: {{ include "sealos-state-metrics.chart" . }}
+{{ include "sealos-state-metrics.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,17 +45,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "state-metrics.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "state-metrics.name" . }}
+{{- define "sealos-state-metrics.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "sealos-state-metrics.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "state-metrics.serviceAccountName" -}}
+{{- define "sealos-state-metrics.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "state-metrics.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "sealos-state-metrics.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -64,6 +64,6 @@ Create the name of the service account to use
 {{/*
 Return the proper image name
 */}}
-{{- define "state-metrics.image" -}}
+{{- define "sealos-state-metrics.image" -}}
 {{- .Values.image }}
 {{- end }}

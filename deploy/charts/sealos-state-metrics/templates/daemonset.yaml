@@ -2,13 +2,13 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "state-metrics.fullname" . }}
+  name: {{ include "sealos-state-metrics.fullname" . }}
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "state-metrics.selectorLabels" . | nindent 6 }}
+      {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
@@ -17,13 +17,13 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "state-metrics.selectorLabels" . | nindent 8 }}
+        {{- include "sealos-state-metrics.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "state-metrics.serviceAccountName" . }}
+      serviceAccountName: {{ include "sealos-state-metrics.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.priorityClassName }}
@@ -38,7 +38,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           {{- end }}
-          image: {{ include "state-metrics.image" . }}
+          image: {{ include "sealos-state-metrics.image" . }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           args:
             - -c
@@ -72,7 +72,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: LEADER_ELECTION_LEASE_NAME
-              value: {{ include "state-metrics.fullname" . }}
+              value: {{ include "sealos-state-metrics.fullname" . }}
             {{- if .Values.tls.enabled }}
             - name: SERVER_TLS_ENABLED
               value: "true"
@@ -130,11 +130,11 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "state-metrics.fullname" . }}
+            name: {{ include "sealos-state-metrics.fullname" . }}
         {{- if .Values.tls.enabled }}
         - name: tls
           secret:
-            secretName: {{ include "state-metrics.fullname" . }}-tls
+            secretName: {{ include "sealos-state-metrics.fullname" . }}-tls
             defaultMode: 0400
         {{- end }}
         {{- if has "lvm" .Values.enabledCollectors }}

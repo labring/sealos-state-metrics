@@ -2,9 +2,9 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "state-metrics.fullname" . }}-selfsigned
+  name: {{ include "sealos-state-metrics.fullname" . }}-selfsigned
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 spec:
   selfSigned: {}
 {{- end }}

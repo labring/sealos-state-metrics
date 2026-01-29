@@ -2,7 +2,7 @@
 
 HELM_OPTS=${HELM_OPTS:-""}
 
-helm upgrade -i state-metrics \
+helm upgrade -i sealos-state-metrics \
     -n sealos --create-namespace \
-    ./charts/state-metrics \
+    ./charts/sealos-state-metrics \
     ${HELM_OPTS}

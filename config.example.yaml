@@ -47,7 +47,7 @@ leaderElection:
   # Enable leader election (useful for deployment mode with multiple replicas)
   enabled: true
   # Name of the leader election lease
-  leaseName: "state-metrics"
+  leaseName: "sealos-state-metrics"
   # Leader election lease duration
   leaseDuration: "15s"
   # Leader election renew deadline

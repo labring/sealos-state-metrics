@@ -16,9 +16,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "state-metrics.fullname" . }}
+  name: {{ include "sealos-state-metrics.fullname" . }}
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 data:
   config.yaml: |
     {{- $appConfig | toYaml | nindent 4 }}

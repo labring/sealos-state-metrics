@@ -21,14 +21,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_REPO != '' && secrets.DOCKERHUB_REPO || secrets.DOCKERHUB_USERNAME != '' && format('{0}/{1}', secrets.DOCKERHUB_USERNAME, 'state-metrics') || '' }}
+  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_REPO != '' && secrets.DOCKERHUB_REPO || secrets.DOCKERHUB_USERNAME != '' && format('{0}/{1}', secrets.DOCKERHUB_USERNAME, 'sealos-state-metrics') || '' }}
   GHCR_REPO: ghcr.io/${{ github.repository }}
   ALIYUN_REGISTRY: ${{ secrets.ALIYUN_REGISTRY }}
-  ALIYUN_REPO: ${{ secrets.ALIYUN_REPO != '' && secrets.ALIYUN_REPO || (secrets.ALIYUN_REGISTRY != '' && secrets.ALIYUN_USERNAME != '') && format('{0}/{1}/{2}', secrets.ALIYUN_REGISTRY, secrets.ALIYUN_USERNAME, 'state-metrics') || '' }}
+  ALIYUN_REPO: ${{ secrets.ALIYUN_REPO != '' && secrets.ALIYUN_REPO || (secrets.ALIYUN_REGISTRY != '' && secrets.ALIYUN_USERNAME != '') && format('{0}/{1}/{2}', secrets.ALIYUN_REGISTRY, secrets.ALIYUN_USERNAME, 'sealos-state-metrics') || '' }}
 
 jobs:
   release:
-    name: Release state-metrics
+    name: Release sealos-state-metrics
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -63,7 +63,7 @@ jobs:
         run: |
           export GOOS=${{ matrix.targets.GOOS }}
           export GOARCH=${{ matrix.targets.GOARCH }}
-          go build -trimpath -ldflags "-s -w" -o state-metrics-${{ matrix.targets.GOOS }}-${{ matrix.targets.GOARCH }}${{ matrix.targets.EXT }}
+          go build -trimpath -ldflags "-s -w" -o sealos-state-metrics-${{ matrix.targets.GOOS }}-${{ matrix.targets.GOARCH }}${{ matrix.targets.EXT }}
 
       - name: Get release meta
         id: release_meta
@@ -100,7 +100,7 @@ jobs:
           name: ${{ steps.release_meta.outputs.RELEASE_NAME }}
           tag_name: ${{ steps.release_meta.outputs.TAG_NAME }}
           files: |
-            state-metrics-${{ matrix.targets.GOOS }}-${{ matrix.targets.GOARCH }}${{ matrix.targets.EXT }}
+            sealos-state-metrics-${{ matrix.targets.GOOS }}-${{ matrix.targets.GOARCH }}${{ matrix.targets.EXT }}
 
   build-docker-images:
     name: Build Docker Images
@@ -302,7 +302,7 @@ jobs:
         working-directory: deploy
         run: |
           sudo sealos login -u "${{ github.repository_owner }}" -p "${{ secrets.GITHUB_TOKEN }}" ghcr.io
-          sed -i "s#image: ghcr.io/labring/state-metrics:latest#image: ${{ env.GHCR_REPO }}:${{ steps.meta.outputs.version }}#g" charts/state-metrics/values.yaml
+          sed -i "s#image: ghcr.io/labring/sealos-state-metrics:latest#image: ${{ env.GHCR_REPO }}:${{ steps.meta.outputs.version }}#g" charts/sealos-state-metrics/values.yaml
           sudo sealos registry save --registry-dir=registry_amd64 --arch amd64 .
           sudo sealos registry save --registry-dir=registry_arm64 --arch arm64 .
 

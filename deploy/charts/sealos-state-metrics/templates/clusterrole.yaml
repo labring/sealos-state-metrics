@@ -2,9 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "state-metrics.fullname" . }}
+  name: {{ include "sealos-state-metrics.fullname" . }}
   labels:
-    {{- include "state-metrics.labels" . | nindent 4 }}
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 rules:
   # Core resources
   - apiGroups: [""]

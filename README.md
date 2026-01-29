@@ -54,7 +54,7 @@ git clone https://github.com/labring/sealos-state-metric.git
 cd sealos-state-metric
 
 # Install using local Helm chart
-helm install state-metrics ./deploy/charts/state-metrics \
+helm install sealos-state-metrics ./deploy/charts/sealos-state-metrics \
   --namespace monitoring \
   --create-namespace \
   --set enabledCollectors={lvm}
@@ -77,7 +77,7 @@ enabledCollectors:
 leaderElection:
   enabled: true
   namespace: ""
-  leaseName: "state-metrics"
+  leaseName: "sealos-state-metrics"
   leaseDuration: "15s"
 
 # Metrics namespace (optional prefix for all metrics)
@@ -158,7 +158,7 @@ vmServiceScrape:
 
 ```yaml
 scrape_configs:
-  - job_name: 'state-metrics'
+  - job_name: 'sealos-state-metrics'
     kubernetes_sd_configs:
       - role: endpoints
         namespaces:
@@ -167,7 +167,7 @@ scrape_configs:
     relabel_configs:
       - source_labels: [__meta_kubernetes_service_name]
         action: keep
-        regex: state-metrics
+        regex: sealos-state-metrics
 ```
 
 ## Metrics Examples
@@ -225,26 +225,26 @@ make lint
 ### Check Pod Status
 
 ```bash
-kubectl get pods -n monitoring -l app.kubernetes.io/name=state-metrics
+kubectl get pods -n monitoring -l app.kubernetes.io/name=sealos-state-metrics
 ```
 
 ### View Logs
 
 ```bash
-kubectl logs -n monitoring -l app.kubernetes.io/name=state-metrics --tail=100
+kubectl logs -n monitoring -l app.kubernetes.io/name=sealos-state-metrics --tail=100
 ```
 
 ### Access Metrics Endpoint
 
 ```bash
-kubectl port-forward -n monitoring svc/state-metrics 9090:9090
+kubectl port-forward -n monitoring svc/sealos-state-metrics 9090:9090
 curl http://localhost:9090/metrics
 ```
 
 ### Leader Election Status
 
 ```bash
-kubectl get lease -n monitoring state-metrics -o yaml
+kubectl get lease -n monitoring sealos-state-metrics -o yaml
 ```
 
 ## License

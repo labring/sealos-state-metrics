@@ -1,4 +1,4 @@
-// Package server provides the main HTTP server for state-metrics
+// Package server provides the main HTTP server for sealos-state-metrics
 package server
 
 import (

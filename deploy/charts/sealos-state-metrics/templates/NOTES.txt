@@ -7,16 +7,16 @@ Enabled collectors: {{ .Values.enabledCollectors | join ", " }}
 Deployment mode: DaemonSet
 
 To get the status of your deployment:
-  kubectl get daemonset {{ include "state-metrics.fullname" . }} -n {{ .Release.Namespace }}
+  kubectl get daemonset {{ include "sealos-state-metrics.fullname" . }} -n {{ .Release.Namespace }}
 
 To view the pods:
-  kubectl get pods -l app.kubernetes.io/name={{ include "state-metrics.name" . }} -n {{ .Release.Namespace }}
+  kubectl get pods -l app.kubernetes.io/name={{ include "sealos-state-metrics.name" . }} -n {{ .Release.Namespace }}
 
 To access the metrics endpoint from a specific node:
   kubectl port-forward -n {{ .Release.Namespace }} <pod-name> {{ .Values.service.port }}:{{ .Values.service.port }}
 
 Or use the service:
-  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "state-metrics.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "sealos-state-metrics.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
 
 Then visit http://localhost:{{ .Values.service.port }}/metrics in your browser.
 

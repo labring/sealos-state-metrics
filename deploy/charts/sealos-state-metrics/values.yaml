@@ -1,5 +1,5 @@
 # Global configuration
-image: ghcr.io/labring/state-metrics:latest
+image: ghcr.io/labring/sealos-state-metrics:latest
 imagePullPolicy: IfNotPresent
 imagePullSecrets: []
 
@@ -109,7 +109,7 @@ config:
 # Leader election configuration
 leaderElection:
   enabled: true
-  leaseName: "state-metrics"
+  leaseName: "sealos-state-metrics"
   leaseDuration: "15s"
   renewDeadline: "10s"
   retryPeriod: "2s"

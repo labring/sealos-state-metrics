@@ -1,0 +1,29 @@
+{{- if and .Values.enabledCollectors .Values.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "sealos-state-metrics.fullname" . }}-tls
+  labels:
+    {{- include "sealos-state-metrics.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "sealos-state-metrics.fullname" . }}-tls
+  duration: {{ .Values.tls.duration }}
+  renewBefore: {{ .Values.tls.renewBefore }}
+  subject:
+    organizations:
+      - {{ .Values.tls.organization | default "sealos" }}
+  commonName: {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc
+  dnsNames:
+    - {{ include "sealos-state-metrics.fullname" . }}
+    - {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}
+    - {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc
+    - {{ include "sealos-state-metrics.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    {{- if .Values.tls.issuer }}
+    name: {{ .Values.tls.issuer }}
+    kind: {{ .Values.tls.issuerKind | default "Issuer" }}
+    {{- else }}
+    name: {{ include "sealos-state-metrics.fullname" . }}-selfsigned
+    kind: Issuer
+    {{- end }}
+{{- end }}
