@@ -1,7 +1,9 @@
 # Sealos State Metrics
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/labring/sealos-state-metric)](https://goreportcard.com/report/github.com/labring/sealos-state-metric)
-[![License](https://img.shields.io/github/license/labring/sealos-state-metric)](https://github.com/labring/sealos-state-metric/blob/main/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/labring/sealos-state-metrics)](https://goreportcard.com/report/github.com/labring/sealos-state-metrics)
+[![License](https://img.shields.io/github/license/labring/sealos-state-metrics)](https://github.com/labring/sealos-state-metrics/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/labring/sealos-state-metrics?filename=go.mod)](https://github.com/labring/sealos-state-metrics/blob/main/go.mod)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/labring/sealos-state-metrics/release.yml?branch=main)](https://github.com/labring/sealos-state-metrics/actions)
 
 A Kubernetes metrics collector for monitoring cluster state and resources. Provides Prometheus-compatible metrics for various aspects of your Kubernetes infrastructure.
 
@@ -50,8 +52,8 @@ helm install state-metrics sealos-state-metrics/state-metrics \
 
 ```bash
 # Clone the repository
-git clone https://github.com/labring/sealos-state-metric.git
-cd sealos-state-metric
+git clone https://github.com/labring/sealos-state-metrics.git
+cd sealos-state-metrics
 
 # Install using local Helm chart
 helm install sealos-state-metrics ./deploy/charts/sealos-state-metrics \
@@ -251,12 +253,7 @@ kubectl get lease -n monitoring sealos-state-metrics -o yaml
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
 
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
-
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/labring/sealos-state-metric/issues)
-- Documentation: [Wiki](https://github.com/labring/sealos-state-metric/wiki)
+- Issues: [GitHub Issues](https://github.com/labring/sealos-state-metrics/issues)
 - Community: [Sealos Community](https://github.com/labring/sealos)
