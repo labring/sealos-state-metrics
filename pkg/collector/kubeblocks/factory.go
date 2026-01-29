@@ -2,9 +2,9 @@
 package kubeblocks
 
 import (
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
-	dynamiccollector "github.com/zijiren233/sealos-state-metric/pkg/collector/dynamic"
-	"github.com/zijiren233/sealos-state-metric/pkg/registry"
+	"github.com/labring/sealos-state-metrics/pkg/collector"
+	dynamiccollector "github.com/labring/sealos-state-metrics/pkg/collector/dynamic"
+	"github.com/labring/sealos-state-metrics/pkg/registry"
 )
 
 const collectorName = "kubeblocks"

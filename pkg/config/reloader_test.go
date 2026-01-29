@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zijiren233/sealos-state-metric/pkg/config"
+	"github.com/labring/sealos-state-metrics/pkg/config"
 )
 
 func TestReloader(t *testing.T) {

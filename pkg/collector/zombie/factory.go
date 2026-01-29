@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
-	"github.com/zijiren233/sealos-state-metric/pkg/registry"
+	"github.com/labring/sealos-state-metrics/pkg/collector"
+	"github.com/labring/sealos-state-metrics/pkg/collector/base"
+	"github.com/labring/sealos-state-metrics/pkg/registry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"

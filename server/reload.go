@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/labring/sealos-state-metrics/pkg/config"
+	"github.com/labring/sealos-state-metrics/pkg/httpserver"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/config"
-	"github.com/zijiren233/sealos-state-metric/pkg/httpserver"
 )
 
 // Reload reloads the server with new configuration.

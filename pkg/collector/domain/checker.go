@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/labring/sealos-state-metrics/pkg/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/util"
 )
 
 // DomainHealth represents the overall health status of a domain

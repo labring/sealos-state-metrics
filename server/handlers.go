@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/labring/sealos-state-metrics/pkg/auth"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/auth"
 )
 
 // setupRoutes configures HTTP routes with optional authentication

@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector/base"
+	"github.com/labring/sealos-state-metrics/pkg/lvm"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
-	"github.com/zijiren233/sealos-state-metric/pkg/lvm"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

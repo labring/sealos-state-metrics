@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector/base"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )

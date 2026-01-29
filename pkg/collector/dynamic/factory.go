@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector"
+	"github.com/labring/sealos-state-metrics/pkg/registry"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
-	"github.com/zijiren233/sealos-state-metric/pkg/registry"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"

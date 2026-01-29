@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector"
+	"github.com/labring/sealos-state-metrics/pkg/config"
+	"github.com/labring/sealos-state-metrics/pkg/identity"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
-	"github.com/zijiren233/sealos-state-metric/pkg/config"
-	"github.com/zijiren233/sealos-state-metric/pkg/identity"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )

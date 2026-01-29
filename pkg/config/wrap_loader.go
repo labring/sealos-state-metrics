@@ -1,8 +1,8 @@
 package config
 
 import (
+	"github.com/labring/sealos-state-metrics/pkg/collector"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 )
 
 // WrapConfigLoader wraps multiple config loaders in a chain

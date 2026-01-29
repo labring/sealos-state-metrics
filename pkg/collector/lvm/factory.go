@@ -3,9 +3,9 @@ package lvm
 import (
 	"context"
 
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
-	"github.com/zijiren233/sealos-state-metric/pkg/registry"
+	"github.com/labring/sealos-state-metrics/pkg/collector"
+	"github.com/labring/sealos-state-metrics/pkg/collector/base"
+	"github.com/labring/sealos-state-metrics/pkg/registry"
 )
 
 const collectorName = "lvm"

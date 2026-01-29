@@ -6,12 +6,12 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/labring/sealos-state-metrics/pkg/collector/all" // Import all collectors
+	"github.com/labring/sealos-state-metrics/pkg/config"
+	"github.com/labring/sealos-state-metrics/pkg/logger"
+	"github.com/labring/sealos-state-metrics/pkg/pprof"
+	"github.com/labring/sealos-state-metrics/server"
 	log "github.com/sirupsen/logrus"
-	_ "github.com/zijiren233/sealos-state-metric/pkg/collector/all" // Import all collectors
-	"github.com/zijiren233/sealos-state-metric/pkg/config"
-	"github.com/zijiren233/sealos-state-metric/pkg/logger"
-	"github.com/zijiren233/sealos-state-metric/pkg/pprof"
-	"github.com/zijiren233/sealos-state-metric/server"
 )
 
 func main() {

@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector/base"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector/base"
 )
 
 // Collector implements cloud balance monitoring

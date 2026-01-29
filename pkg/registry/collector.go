@@ -4,10 +4,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/collector"
 )
 
 // collectorResult holds the result of a collector execution

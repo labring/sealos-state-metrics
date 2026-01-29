@@ -3,7 +3,7 @@ package lvm_test
 import (
 	"testing"
 
-	"github.com/zijiren233/sealos-state-metric/pkg/lvm"
+	"github.com/labring/sealos-state-metrics/pkg/lvm"
 )
 
 func TestListLVMVolumeGroup(t *testing.T) {

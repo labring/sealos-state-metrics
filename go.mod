@@ -1,4 +1,4 @@
-module github.com/zijiren233/sealos-state-metric
+module github.com/labring/sealos-state-metrics
 
 go 1.25.0
 

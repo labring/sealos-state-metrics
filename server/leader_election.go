@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/labring/sealos-state-metrics/pkg/leaderelection"
 	log "github.com/sirupsen/logrus"
-	"github.com/zijiren233/sealos-state-metric/pkg/leaderelection"
 )
 
 // setupLeaderElection creates and starts the leader elector
