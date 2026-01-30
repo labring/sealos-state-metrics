@@ -55,7 +55,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			// Start background polling
 			go c.pollLoop(ctx)
 
-			c.logger.Info("CloudBalance collector started successfully")
+			c.logger.Info("UserBalance collector started successfully")
 			return nil
 		},
 		CollectFunc: c.collect,
