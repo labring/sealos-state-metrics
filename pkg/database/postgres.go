@@ -66,7 +66,7 @@ func WithPingTimeout(d time.Duration) PoolOption {
 	}
 }
 
-func InitPgClient(dsn string, opts ...PoolOption) (*pgxpool.Pool, error) {
+func InitPgClient(ctx context.Context, dsn string, opts ...PoolOption) (*pgxpool.Pool, error) {
 	poolConfig := DefaultPoolConfig()
 
 	for _, opt := range opts {
@@ -84,15 +84,15 @@ func InitPgClient(dsn string, opts ...PoolOption) (*pgxpool.Pool, error) {
 	config.MaxConnIdleTime = poolConfig.MaxConnIdleTime
 	config.HealthCheckPeriod = poolConfig.HealthCheckPeriod
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), poolConfig.PingTimeout)
+	pingCtx, cancel := context.WithTimeout(ctx, poolConfig.PingTimeout)
 	defer cancel()
 
-	if err := pool.Ping(ctx); err != nil {
+	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
