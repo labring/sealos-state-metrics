@@ -44,7 +44,11 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	// Set lifecycle hooks
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
-			pgClient, err := database.InitPgClient(ctx, cfg.DatabaseConfig.DSN)
+			pgClient, err := database.InitPgClient(
+				ctx,
+				cfg.DatabaseConfig.DSN,
+				database.WithMinConns(1),
+			)
 			if err != nil {
 				factoryCtx.Logger.WithError(err).
 					Debug("Failed to load postgres client")
