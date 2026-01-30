@@ -1,35 +1,37 @@
-package cloudbalance
+package userbalance
 
 import (
 	"context"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labring/sealos-state-metrics/pkg/collector/base"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
-// Collector implements cloud balance monitoring
+// Collector implements user balance monitoring
 type Collector struct {
 	*base.BaseCollector
-	config *Config
-	logger *log.Entry
+	config   *Config
+	logger   *log.Entry
+	pgClient *pgxpool.Pool
 
 	// Prometheus metrics
 	balanceGauge *prometheus.Desc
 
 	// Internal state
 	mu       sync.RWMutex
-	balances map[string]float64 // key: provider:accountID
+	balances map[string]float64
 }
 
 // initMetrics initializes Prometheus metric descriptors
 func (c *Collector) initMetrics(namespace string) {
 	c.balanceGauge = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "cloudbalance", "balance"),
-		"Current balance for each cloud account",
-		[]string{"provider", "account_id"},
+		prometheus.BuildFQName(namespace, "userbalance", "balance"),
+		"Current balance for each sealos user",
+		[]string{"region", "uuid", "uid", "owner", "type", "level"},
 		nil,
 	)
 
@@ -47,7 +49,7 @@ func (c *Collector) Interval() time.Duration {
 	return c.config.CheckInterval
 }
 
-// pollLoop periodically queries cloud balances
+// pollLoop periodically queries user balances
 func (c *Collector) pollLoop(ctx context.Context) {
 	// Initial poll
 	_ = c.Poll(ctx)
@@ -69,41 +71,40 @@ func (c *Collector) pollLoop(ctx context.Context) {
 	}
 }
 
-// Poll queries all configured cloud accounts
+// Poll queries all configured user accounts
 func (c *Collector) Poll(ctx context.Context) error {
-	if len(c.config.Accounts) == 0 {
-		c.logger.Debug("No cloud accounts configured for monitoring")
+	if len(c.config.UserConfig) == 0 {
+		c.logger.Debug("No sealos user configured for monitoring")
 		return nil
 	}
 
-	c.logger.WithField("count", len(c.config.Accounts)).Info("Starting cloud balance checks")
+	c.logger.WithField("count", len(c.config.UserConfig)).Info("Starting cloud balance checks")
 
 	newBalances := make(map[string]float64)
-	for _, account := range c.config.Accounts {
+	for _, user := range c.config.UserConfig {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		balance, err := QueryBalance(account)
+		balance, err := c.QueryBalance(user)
 		if err != nil {
 			c.logger.WithFields(log.Fields{
-				"provider":   account.Provider,
-				"account_id": account.AccountID,
-			}).WithError(err).Error("Failed to query cloud balance")
+				"user_id": user.UID,
+			}).WithError(err).Error("Failed to query sealos user balance")
 
 			continue
 		}
 
-		key := string(account.Provider) + ":" + account.AccountID
+		key := user.Region + ":" + user.UID
 		newBalances[key] = balance
 
 		c.logger.WithFields(log.Fields{
-			"provider":   account.Provider,
-			"account_id": account.AccountID,
-			"balance":    balance,
-		}).Debug("Cloud balance updated")
+			"region":  user.Region,
+			"uid":     user.UID,
+			"balance": balance,
+		}).Debug("User balance updated")
 	}
 
 	c.mu.Lock()
@@ -118,8 +119,8 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	for _, account := range c.config.Accounts {
-		key := string(account.Provider) + ":" + account.AccountID
+	for _, user := range c.config.UserConfig {
+		key := user.Region + ":" + user.UID
 
 		balance, exists := c.balances[key]
 		if !exists {
@@ -130,8 +131,12 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 			c.balanceGauge,
 			prometheus.GaugeValue,
 			balance,
-			string(account.Provider),
-			account.AccountID,
+			user.Region,
+			user.UUID,
+			user.UID,
+			user.Owner,
+			user.Type,
+			user.Level,
 		)
 	}
 }

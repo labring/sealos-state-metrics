@@ -87,6 +87,29 @@ enabledCollectors:
 # ============================================================================
 
 collectors:
+  # User Balance collector - monitors sealos user balance
+  userbalance:
+    # Check interval for querying cloud balances
+    checkInterval: "5m"
+    # user postgres dsn
+    database:
+      dsn: "postgresql://username:password@www.example.com:port/defaultdb"
+    # sealos user list
+    users:
+      - region: us-west-2
+        uuid: 550e8400-e29b-41d4-a716-446655440002
+        uid: user002
+        owner: jane.smith@example.com
+        type: standard
+        level: silver
+
+      - region: eu-west-1
+        uuid: 550e8400-e29b-41d4-a716-446655440003
+        uid: user003
+        owner: bob.wilson@example.com
+        type: enterprise
+        level: platinum
+
   # Domain collector - monitors domain health
   domain:
     # List of domains to monitor
