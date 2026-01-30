@@ -10,9 +10,15 @@ import (
 
 // setupLeaderElection creates and starts the leader elector
 func (s *Server) setupLeaderElection() error {
+	// Get Kubernetes client via shared client provider
+	client, err := s.getKubernetesClient()
+	if err != nil {
+		return fmt.Errorf("failed to get Kubernetes client for leader election: %w", err)
+	}
+
 	elector, err := leaderelection.NewLeaderElector(
 		s.buildLeaderElectionConfig(),
-		s.client,
+		client,
 		log.WithField("component", "leader-election"),
 	)
 	if err != nil {

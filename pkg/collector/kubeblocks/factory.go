@@ -2,6 +2,8 @@
 package kubeblocks
 
 import (
+	"fmt"
+
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	dynamiccollector "github.com/labring/sealos-state-metrics/pkg/collector/dynamic"
 	"github.com/labring/sealos-state-metrics/pkg/registry"
@@ -15,6 +17,12 @@ func init() {
 
 // NewCollector creates a new KubeBlocks Cluster collector using configuration-driven approach
 func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, error) {
+	// Get Kubernetes rest config (lazy initialization)
+	restConfig, err := factoryCtx.GetRestConfig()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes rest config is required but not available: %w", err)
+	}
+
 	// 1. Load KubeBlocks-specific configuration
 	cfg := NewDefaultConfig()
 	if err := factoryCtx.ConfigLoader.LoadModuleConfig("collectors.kubeblocks", cfg); err != nil {
@@ -32,7 +40,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		collectorName,
 		crdCfg,
 		factoryCtx.MetricsNamespace,
-		factoryCtx.RestConfig,
+		restConfig,
 		factoryCtx.Logger,
 	)
 }

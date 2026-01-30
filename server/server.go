@@ -4,39 +4,38 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/httpserver"
 	"github.com/labring/sealos-state-metrics/pkg/identity"
 	"github.com/labring/sealos-state-metrics/pkg/leaderelection"
 	"github.com/labring/sealos-state-metrics/pkg/registry"
 	"github.com/labring/sealos-state-metrics/pkg/tlscache"
-	"github.com/labring/sealos-state-metrics/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 // Server represents the HTTP server
 type Server struct {
-	config        *config.GlobalConfig
-	configContent []byte
-	mainServer    *httpserver.Server
-	debugServer   *httpserver.Server
-	registry      *registry.Registry
-	promRegistry  *prometheus.Registry
-	leaderElector *leaderelection.LeaderElector
+	config         *config.GlobalConfig
+	configContent  []byte
+	mainServer     *httpserver.Server
+	debugServer    *httpserver.Server
+	registry       *registry.Registry
+	promRegistry   *prometheus.Registry
+	leaderElector  *leaderelection.LeaderElector
+	clientProvider collector.ClientProvider // Shared client provider for lazy initialization
 
 	// Fields needed for reinitialization
 	mu sync.RWMutex // Protects reload operations; readers (Collect) use RLock, writers (Reload) use Lock
 	//nolint:containedctx // Context stored for reload functionality
-	serverCtx  context.Context
-	restConfig *rest.Config
-	client     kubernetes.Interface
+	serverCtx context.Context
 
 	// Leader election management
 	leCtxCancel context.CancelFunc
@@ -69,11 +68,18 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) Init(ctx context.Context) error {
 	s.serverCtx = ctx
 
-	// Initialize Kubernetes client and collectors
-	if err := s.initKubernetesClient(s.config.Kubernetes); err != nil {
-		return err
-	}
+	// Create shared client provider for lazy Kubernetes client initialization
+	s.clientProvider = collector.NewClientProvider(
+		collector.ClientConfig{
+			Kubeconfig: s.config.Kubernetes.Kubeconfig,
+			QPS:        s.config.Kubernetes.QPS,
+			Burst:      s.config.Kubernetes.Burst,
+		},
+		log.WithField("component", "client-provider"),
+	)
 
+	// Initialize collectors with lazy client loading
+	// The Kubernetes client will be initialized on-demand when collectors call GetClient()
 	if err := s.registry.Initialize(s.buildInitConfig()); err != nil {
 		return fmt.Errorf("failed to initialize collectors: %w", err)
 	}
@@ -119,10 +125,16 @@ func (s *Server) Serve() error {
 		}).Info("TLS enabled with certificate auto-reload via fsnotify")
 	}
 
+	// Create main HTTP handler
+	mainHandler, err := s.createMainHandler()
+	if err != nil {
+		return fmt.Errorf("failed to create main handler: %w", err)
+	}
+
 	// Create main HTTP server
 	s.mainServer = httpserver.New(httpserver.Config{
 		Address:   s.config.Server.Address,
-		Handler:   s.createMainHandler(),
+		Handler:   mainHandler,
 		TLSConfig: tlsConfig,
 		Name:      "main",
 	})
@@ -133,9 +145,14 @@ func (s *Server) Serve() error {
 
 	// Start debug server if enabled
 	if s.config.DebugServer.Enabled {
+		debugHandler, err := s.createDebugHandler()
+		if err != nil {
+			return fmt.Errorf("failed to create debug handler: %w", err)
+		}
+
 		s.debugServer = httpserver.New(httpserver.Config{
 			Address: fmt.Sprintf("127.0.0.1:%d", s.config.DebugServer.Port),
-			Handler: s.createDebugHandler(),
+			Handler: debugHandler,
 			Name:    "debug",
 		})
 
@@ -178,25 +195,20 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
-// initKubernetesClient creates and stores the Kubernetes client
-func (s *Server) initKubernetesClient(cfg config.KubernetesConfig) error {
-	restConfig, client, err := util.NewKubernetesClient(cfg.Kubeconfig, cfg.QPS, cfg.Burst)
-	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes client: %w", err)
+// getKubernetesClient returns the Kubernetes client via the shared client provider
+// This is used by leader election
+func (s *Server) getKubernetesClient() (kubernetes.Interface, error) {
+	if s.clientProvider == nil {
+		return nil, errors.New("client provider not initialized")
 	}
-
-	s.restConfig = restConfig
-	s.client = client
-
-	return nil
+	return s.clientProvider.GetClient()
 }
 
 // buildInitConfig creates registry.InitConfig from current server state
 func (s *Server) buildInitConfig() *registry.InitConfig {
 	return &registry.InitConfig{
 		Ctx:                  s.serverCtx,
-		RestConfig:           s.restConfig,
-		Client:               s.client,
+		ClientProvider:       s.clientProvider,
 		ConfigContent:        s.configContent,
 		Identity:             s.config.Identity,
 		NodeName:             s.config.NodeName,
@@ -224,21 +236,31 @@ func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
 }
 
 // createMainHandler creates the HTTP handler for main server (with optional auth)
-func (s *Server) createMainHandler() http.Handler {
+func (s *Server) createMainHandler() (http.Handler, error) {
 	mux := http.NewServeMux()
-	s.setupRoutes(
+	if err := s.setupRoutes(
 		mux,
 		s.config.Server.MetricsPath,
 		s.config.Server.HealthPath,
 		s.config.Server.Auth.Enabled,
-	)
+	); err != nil {
+		return nil, err
+	}
 
-	return mux
+	return mux, nil
 }
 
 // createDebugHandler creates HTTP handler for debug server (no auth)
-func (s *Server) createDebugHandler() http.Handler {
+func (s *Server) createDebugHandler() (http.Handler, error) {
 	mux := http.NewServeMux()
-	s.setupRoutes(mux, s.config.DebugServer.MetricsPath, s.config.DebugServer.HealthPath, false)
-	return mux
+	if err := s.setupRoutes(
+		mux,
+		s.config.DebugServer.MetricsPath,
+		s.config.DebugServer.HealthPath,
+		false,
+	); err != nil {
+		return nil, err
+	}
+
+	return mux, nil
 }

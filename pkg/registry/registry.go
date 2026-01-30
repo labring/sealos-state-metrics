@@ -11,8 +11,6 @@ import (
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/identity"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -29,18 +27,20 @@ var (
 // Registry manages the lifecycle of all collectors.
 // It follows the node_exporter pattern with a factory-based registration system.
 type Registry struct {
-	mu         sync.RWMutex
-	factories  map[string]collector.Factory
-	collectors map[string]collector.Collector
-	instance   string // instance identity (pod name or hostname)
+	mu               sync.RWMutex
+	factories        map[string]collector.Factory
+	collectors       map[string]collector.Collector
+	failedCollectors map[string]error // Records collectors that failed to initialize
+	instance         string           // instance identity (pod name or hostname)
 }
 
 // GetRegistry returns the singleton registry instance
 func GetRegistry() *Registry {
 	once.Do(func() {
 		globalRegistry = &Registry{
-			factories:  make(map[string]collector.Factory),
-			collectors: make(map[string]collector.Collector),
+			factories:        make(map[string]collector.Factory),
+			collectors:       make(map[string]collector.Collector),
+			failedCollectors: make(map[string]error),
 		}
 	})
 
@@ -82,8 +82,7 @@ func MustRegister(name string, factory collector.Factory) {
 type InitConfig struct {
 	//nolint:containedctx // Context passed to collectors for lifecycle management
 	Ctx                  context.Context
-	RestConfig           *rest.Config
-	Client               kubernetes.Interface
+	ClientProvider       collector.ClientProvider // Shared client provider for lazy initialization
 	ConfigContent        []byte
 	Identity             string
 	NodeName             string
@@ -121,8 +120,9 @@ func (r *Registry) Reinitialize(cfg *InitConfig) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Clear collectors map (assumes all collectors are already stopped by caller)
+	// Clear collectors and failed collectors maps (assumes all collectors are already stopped by caller)
 	r.collectors = make(map[string]collector.Collector)
+	r.failedCollectors = make(map[string]error)
 
 	r.createCollectors(cfg, "Reinitializing")
 
@@ -154,15 +154,16 @@ func (r *Registry) createCollectors(cfg *InitConfig, action string) {
 	for _, name := range cfg.EnabledCollectors {
 		factory, exists := r.factories[name]
 		if !exists {
+			err := errors.New("collector factory not found")
+			r.failedCollectors[name] = err
 			logger.Warnf("Collector factory not found: %s", name)
 			continue
 		}
 
 		factoryCtx := &collector.FactoryContext{
 			Ctx:                  cfg.Ctx,
-			RestConfig:           cfg.RestConfig,
-			Client:               cfg.Client,
 			ConfigLoader:         configLoader,
+			ClientProvider:       cfg.ClientProvider,
 			Identity:             r.instance,
 			NodeName:             cfg.NodeName,
 			PodName:              cfg.PodName,
@@ -173,7 +174,8 @@ func (r *Registry) createCollectors(cfg *InitConfig, action string) {
 
 		c, err := factory(factoryCtx)
 		if err != nil {
-			logger.WithField("name", name).WithError(err).Debug("Collector not enabled")
+			r.failedCollectors[name] = err
+			logger.WithField("name", name).WithError(err).Error("Collector initialization failed")
 			continue
 		}
 
@@ -394,4 +396,13 @@ func (r *Registry) GetAllCollectors() map[string]collector.Collector {
 	defer r.mu.RUnlock()
 
 	return r.collectors
+}
+
+// GetFailedCollectors returns a map of collectors that failed to initialize
+// The map contains collector names as keys and their initialization errors as values
+func (r *Registry) GetFailedCollectors() map[string]error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.failedCollectors
 }

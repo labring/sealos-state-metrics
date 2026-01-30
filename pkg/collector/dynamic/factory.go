@@ -37,8 +37,14 @@ func NewConfigurableDynamicCollector(
 		return nil, nil
 	}
 
-	// 3. Create dynamic client
-	dynamicClient, err := createDynamicClient(factoryCtx.RestConfig)
+	// 3. Get Kubernetes rest config (lazy initialization)
+	restConfig, err := factoryCtx.GetRestConfig()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes rest config is required but not available: %w", err)
+	}
+
+	// 4. Create dynamic client
+	dynamicClient, err := createDynamicClient(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
@@ -200,16 +206,6 @@ func (mc *multiCollector) Stop() error {
 	}
 
 	return lastErr
-}
-
-func (mc *multiCollector) WaitReady(ctx context.Context) error {
-	for _, c := range mc.collectors {
-		if err := c.WaitReady(ctx); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (mc *multiCollector) Health() error {

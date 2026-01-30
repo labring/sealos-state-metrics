@@ -3,6 +3,7 @@ package imagepull
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector"
@@ -22,6 +23,12 @@ func init() {
 
 // NewCollector creates a new ImagePull collector
 func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, error) {
+	// Get Kubernetes client (lazy initialization)
+	client, err := factoryCtx.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes client is required but not available: %w", err)
+	}
+
 	// 1. Start with hard-coded defaults
 	cfg := NewDefaultConfig()
 
@@ -38,7 +45,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			factoryCtx.Logger,
 			base.WithWaitReadyOnCollect(true),
 		),
-		client:     factoryCtx.Client,
+		client:     client,
 		config:     cfg,
 		classifier: NewFailureClassifier(),
 		failures:   make(map[string]*PullFailureInfo),

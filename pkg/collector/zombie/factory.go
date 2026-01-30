@@ -24,6 +24,17 @@ func init() {
 
 // NewCollector creates a new Zombie collector
 func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, error) {
+	// Get Kubernetes client and rest config (lazy initialization)
+	client, err := factoryCtx.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes client is required but not available: %w", err)
+	}
+
+	restConfig, err := factoryCtx.GetRestConfig()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes rest config is required but not available: %w", err)
+	}
+
 	// 1. Start with hard-coded defaults
 	cfg := NewDefaultConfig()
 
@@ -35,7 +46,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	}
 
 	// Create metrics clientset
-	metricsClientset, err := metricsclientset.NewForConfig(factoryCtx.RestConfig)
+	metricsClientset, err := metricsclientset.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metrics clientset: %w", err)
 	}
@@ -46,7 +57,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			factoryCtx.Logger,
 			base.WithWaitReadyOnCollect(true),
 		),
-		client:           factoryCtx.Client,
+		client:           client,
 		metricsClientset: metricsClientset,
 		config:           cfg,
 		nodes:            make(map[string]*corev1.Node),

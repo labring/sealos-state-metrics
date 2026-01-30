@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/httpserver"
 	log "github.com/sirupsen/logrus"
@@ -55,13 +56,19 @@ func (s *Server) Reload(newConfigContent []byte, newConfig *config.GlobalConfig)
 		}
 	}
 
-	// Recreate Kubernetes client if config changed
+	// Recreate client provider if K8s config changed
+	// This will cause the client to be re-initialized with new config when needed
 	if k8sConfigChanged {
-		logger.Info("Kubernetes configuration changed, recreating client")
+		logger.Info("Kubernetes configuration changed, creating new client provider")
 
-		if err := s.initKubernetesClient(s.config.Kubernetes); err != nil {
-			return err
-		}
+		s.clientProvider = collector.NewClientProvider(
+			collector.ClientConfig{
+				Kubeconfig: s.config.Kubernetes.Kubeconfig,
+				QPS:        s.config.Kubernetes.QPS,
+				Burst:      s.config.Kubernetes.Burst,
+			},
+			log.WithField("component", "client-provider"),
+		)
 	}
 
 	// 3. Reinitialize and start collectors atomically, and setup leader election if needed
@@ -89,9 +96,14 @@ func (s *Server) reloadDebugServer() error {
 
 	// Start new debug server if enabled
 	if s.config.DebugServer.Enabled {
+		debugHandler, err := s.createDebugHandler()
+		if err != nil {
+			return fmt.Errorf("failed to create debug handler: %w", err)
+		}
+
 		s.debugServer = httpserver.New(httpserver.Config{
 			Address: fmt.Sprintf("127.0.0.1:%d", s.config.DebugServer.Port),
-			Handler: s.createDebugHandler(),
+			Handler: debugHandler,
 			Name:    "debug",
 		})
 

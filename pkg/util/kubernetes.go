@@ -59,7 +59,10 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 	// 3. Fall back to in-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+		return nil, fmt.Errorf(
+			"failed to get in-cluster config: %w (hint: ensure you're running in a Kubernetes cluster or provide valid kubeconfig)",
+			err,
+		)
 	}
 
 	return config, nil

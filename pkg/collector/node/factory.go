@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/collector/base"
@@ -21,6 +22,12 @@ func init() {
 
 // NewCollector creates a new Node collector
 func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, error) {
+	// Get Kubernetes client (lazy initialization)
+	client, err := factoryCtx.GetClient()
+	if err != nil {
+		return nil, fmt.Errorf("kubernetes client is required but not available: %w", err)
+	}
+
 	// 1. Start with hard-coded defaults
 	cfg := NewDefaultConfig()
 
@@ -37,7 +44,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			factoryCtx.Logger,
 			base.WithWaitReadyOnCollect(true),
 		),
-		client: factoryCtx.Client,
+		client: client,
 		config: cfg,
 		nodes:  make(map[string]*corev1.Node),
 		stopCh: make(chan struct{}),

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,7 +19,6 @@ type Collector interface {
 	Name() string
 
 	// RequiresLeaderElection returns true if this collector should only run on the leader instance.
-	// Collectors that monitor cluster-wide resources should return true.
 	// Collectors that only read local data can return false to run on all instances.
 	RequiresLeaderElection() bool
 
@@ -38,10 +38,6 @@ type Collector interface {
 
 	// Health performs a health check on the collector
 	Health() error
-
-	// WaitReady blocks until the collector is ready to collect metrics
-	// Returns immediately if already ready, or if context is cancelled
-	WaitReady(ctx context.Context) error
 }
 
 // InformerCollector extends Collector for informer-based collectors
@@ -73,8 +69,6 @@ type ConfigLoader interface {
 type FactoryContext struct {
 	//nolint:containedctx // Context is part of factory parameters struct, passed to factory functions
 	Ctx          context.Context
-	RestConfig   *rest.Config
-	Client       kubernetes.Interface
 	ConfigLoader ConfigLoader // Loader for module-specific configuration (never nil, use NullLoader as fallback)
 
 	// Global configs that all collectors might need
@@ -86,6 +80,32 @@ type FactoryContext struct {
 
 	// Logger is the base logger, collectors should use Logger.WithField("collector", name) for component-specific logging
 	Logger *log.Entry
+
+	// ClientProvider for lazy Kubernetes client initialization (shared across all collectors)
+	ClientProvider ClientProvider
+}
+
+// ClientConfig holds Kubernetes client configuration
+type ClientConfig struct {
+	Kubeconfig string
+	QPS        float32
+	Burst      int
+}
+
+// GetRestConfig returns the Kubernetes REST config, initializing it lazily if needed
+func (f *FactoryContext) GetRestConfig() (*rest.Config, error) {
+	if f.ClientProvider == nil {
+		return nil, errors.New("client provider not set")
+	}
+	return f.ClientProvider.GetRestConfig()
+}
+
+// GetClient returns the Kubernetes client, initializing it lazily if needed
+func (f *FactoryContext) GetClient() (kubernetes.Interface, error) {
+	if f.ClientProvider == nil {
+		return nil, errors.New("client provider not set")
+	}
+	return f.ClientProvider.GetClient()
 }
 
 // Factory is a function type that creates a new collector instance.

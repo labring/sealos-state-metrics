@@ -11,7 +11,11 @@ import (
 )
 
 // setupRoutes configures HTTP routes with optional authentication
-func (s *Server) setupRoutes(mux *http.ServeMux, metricsPath, healthPath string, enableAuth bool) {
+func (s *Server) setupRoutes(
+	mux *http.ServeMux,
+	metricsPath, healthPath string,
+	enableAuth bool,
+) error {
 	// Metrics endpoint with optional authentication
 	metricsHandler := promhttp.HandlerFor(
 		s.promRegistry,
@@ -22,7 +26,13 @@ func (s *Server) setupRoutes(mux *http.ServeMux, metricsPath, healthPath string,
 
 	// Apply authentication middleware if enabled
 	if enableAuth {
-		authenticator := auth.NewAuthenticator(s.client)
+		// Get Kubernetes client for authentication
+		client, err := s.getKubernetesClient()
+		if err != nil {
+			return fmt.Errorf("failed to get Kubernetes client for authentication: %w", err)
+		}
+
+		authenticator := auth.NewAuthenticator(client)
 		metricsHandler = authenticator.Middleware(metricsHandler)
 
 		log.Info("Kubernetes authentication enabled for metrics endpoint")
@@ -41,16 +51,24 @@ func (s *Server) setupRoutes(mux *http.ServeMux, metricsPath, healthPath string,
 
 	// Root endpoint (no authentication)
 	mux.HandleFunc("/", s.handleRoot)
+
+	return nil
 }
 
 // handleHealth handles health check requests
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	// Get all collectors
 	allCollectors := s.registry.GetAllCollectors()
+	failedCollectors := s.registry.GetFailedCollectors()
 
 	// Determine which collectors should be checked based on leader election state
-	healthStatus := make(map[string]error)
+	healthStatus := make(map[string]string)
 	allHealthy := true
+
+	// Leader-required collector: only check if we are the leader
+	s.leMu.Lock()
+	isLeader := s.leaderElector != nil && s.leaderElector.IsLeader()
+	s.leMu.Unlock()
 
 	for name, c := range allCollectors {
 		// Determine if this collector should be checked
@@ -62,11 +80,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		} else {
 			// Leader election enabled
 			if c.RequiresLeaderElection() {
-				// Leader-required collector: only check if we are the leader
-				s.leMu.Lock()
-				isLeader := s.leaderElector != nil && s.leaderElector.IsLeader()
-				s.leMu.Unlock()
-
 				shouldCheck = isLeader
 			} else {
 				// Non-leader collector: always check (should always be running)
@@ -76,12 +89,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 		if shouldCheck {
 			err := c.Health()
-
-			healthStatus[name] = err
 			if err != nil {
+				healthStatus[name] = err.Error()
 				allHealthy = false
 			}
 		}
+	}
+
+	// Add failed collectors to health status
+	for name, err := range failedCollectors {
+		healthStatus[name] = err.Error()
+		allHealthy = false
 	}
 
 	status := http.StatusOK
@@ -90,8 +108,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	writeJSON(w, status, map[string]any{
-		"status":     allHealthy,
-		"collectors": healthStatus,
+		"status":    allHealthy,
+		"unhealthy": healthStatus,
 	})
 }
 
