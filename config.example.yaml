@@ -88,7 +88,7 @@ enabledCollectors:
 
 collectors:
   # User Balance collector - monitors sealos user balance
-  user:
+  userbalance:
     # Check interval for querying cloud balances
     checkInterval: "5m"
     # user postgres dsn
