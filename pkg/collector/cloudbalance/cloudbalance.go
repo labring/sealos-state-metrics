@@ -106,7 +106,7 @@ func (c *Collector) Poll(ctx context.Context) error {
 	}
 	c.mu.Lock()
 	c.balances = newBalances
-	defer c.mu.Unlock()
+	c.mu.Unlock()
 	return nil
 }
 
