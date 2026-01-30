@@ -23,7 +23,7 @@ type Collector struct {
 
 	// Internal state
 	mu       sync.RWMutex
-	balances map[string]float64 // key: provider:accountID
+	balances map[string]float64
 }
 
 // initMetrics initializes Prometheus metric descriptors
