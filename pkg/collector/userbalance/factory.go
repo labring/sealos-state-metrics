@@ -2,6 +2,7 @@ package userbalance
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/collector/base"
@@ -27,14 +28,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			Debug("Failed to load userbalance collector config, using defaults")
 	}
 
-	// 3. Load postgres client
-	pgClient, err := database.InitPgClient(cfg.DatabaseConfig.DSN)
-	if err != nil {
-		factoryCtx.Logger.WithError(err).
-			Debug("Failed to load postgres client")
-	}
-	defer pgClient.Close()
-
 	c := &Collector{
 		BaseCollector: base.NewBaseCollector(
 			collectorName,
@@ -42,7 +35,6 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			base.WithWaitReadyOnCollect(true),
 		),
 		config:   cfg,
-		pgClient: pgClient,
 		balances: make(map[string]float64),
 		logger:   factoryCtx.Logger,
 	}
@@ -52,6 +44,13 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	// Set lifecycle hooks
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
+			pgClient, err := database.InitPgClient(cfg.DatabaseConfig.DSN)
+			if err != nil {
+				factoryCtx.Logger.WithError(err).
+					Debug("Failed to load postgres client")
+				return fmt.Errorf("failed to initialize postgres client: %w", err)
+			}
+			c.pgClient = pgClient
 			// Start background polling
 			go c.pollLoop(ctx)
 
@@ -59,6 +58,13 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			return nil
 		},
 		CollectFunc: c.collect,
+		StopFunc: func() error {
+			if c.pgClient != nil {
+				c.pgClient.Close()
+				c.logger.Debug("Database connection closed")
+			}
+			return nil
+		},
 	})
 
 	return c, nil

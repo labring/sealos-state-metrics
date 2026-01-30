@@ -6,6 +6,9 @@ import (
 )
 
 func (c *Collector) QueryBalance(user UserConfig) (float64, error) {
+	if c.pgClient == nil {
+		return 0, fmt.Errorf("database client is not initialized")
+	}
 	query := `
         SELECT 
             u.uid,
