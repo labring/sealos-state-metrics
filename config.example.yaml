@@ -87,7 +87,7 @@ enabledCollectors:
 # ============================================================================
 
 collectors:
-  # User collector - monitors sealos user balance
+  # User Balance collector - monitors sealos user balance
   user:
     # Check interval for querying cloud balances
     checkInterval: "5m"
