@@ -9,16 +9,21 @@ RUN apk add --no-cache git make
 
 # Copy go mod files
 COPY go.mod go.sum ./
-RUN go mod download
+
+# Download dependencies with cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy source code
 COPY . .
 
-# Build the binary
-RUN go build -trimpath -ldflags "-s -w" -o /sealos-state-metrics .
+# Build the binary with cache mounts for both mod and build cache
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -trimpath -ldflags "-s -w" -o /sealos-state-metrics .
 
 # Final image with LVM tools
-FROM alpine:3.18.4
+FROM alpine:latest
 
 # Install LVM tools and dependencies
 RUN apk add --no-cache \
