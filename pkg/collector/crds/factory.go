@@ -77,8 +77,8 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		)
 		informerConfig := informer.InformerConfig{
 			GVR: schema.GroupVersionResource{
-				Group:    crdCfg.GVR.Resource,
-				Resource: crdCfg.Name,
+				Group:    crdCfg.GVR.Group,
+				Resource: crdCfg.GVR.Resource,
 				Version:  crdCfg.GVR.Version,
 			},
 			ResyncPeriod: crdCfg.ResyncPeriod,
@@ -119,6 +119,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 					return err
 				}
 			}
+			c.SetReady()
 			return nil
 		},
 		CollectFunc: c.collect,

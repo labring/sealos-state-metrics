@@ -133,6 +133,8 @@ func (c *CrdCollector) Collect(ch chan<- prometheus.Metric) {
 				c.collectInfoMetric(ch, desc, obj, &metricCfg, commonLabels)
 			case "gauge":
 				c.collectGaugeMetric(ch, desc, obj, &metricCfg, commonLabels)
+			case "string_state":
+				c.collectStringStateMetric(ch, desc, obj, &metricCfg, commonLabels)
 			case "map_state":
 				c.collectMapStateMetric(ch, desc, obj, &metricCfg, commonLabels)
 			case "map_gauge":
@@ -185,6 +187,11 @@ func (c *CrdCollector) buildDescriptors() error {
 		case "count":
 			// count 类型：只有一个标签（字段值）
 			labelNames = []string{"value"}
+		case "string_state":
+			// map_state 类型：通用标签 + key + state
+			labelNames = make([]string, len(commonLabelNames))
+			copy(labelNames, commonLabelNames)
+			labelNames = append(labelNames, "key", "state")
 
 		case "map_state":
 			// map_state 类型：通用标签 + key + state
@@ -291,6 +298,36 @@ func (c *CrdCollector) collectCountMetric(
 	}
 }
 
+// func (c *CrdCollector) collectMapStateMetric(
+// 	ch chan<- prometheus.Metric,
+// 	desc *prometheus.Desc,
+// 	obj *unstructured.Unstructured,
+// 	cfg *MetricConfig,
+// 	commonLabels []string,
+// ) {
+// 	mapData := helpers.ExtractFieldMap(obj, cfg.Path)
+//
+// 	for key, entryData := range mapData {
+// 		entryMap, ok := entryData.(map[string]any)
+// 		if !ok {
+// 			continue
+// 		}
+//
+// 		currentState, _ := entryMap[cfg.ValuePath].(string)
+//
+// 		// 只在有当前状态时发送指标
+// 		if currentState == "" {
+// 			continue
+// 		}
+//
+// 		labels := make([]string, len(commonLabels), len(commonLabels)+2)
+// 		copy(labels, commonLabels)
+// 		labels = append(labels, key, currentState)
+//
+// 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1.0, labels...)
+// 	}
+// }
+
 // collectMapStateMetric 收集 map_state 类型指标
 // 用于暴露 map 中每个条目的状态，值为 1
 func (c *CrdCollector) collectMapStateMetric(
@@ -300,18 +337,94 @@ func (c *CrdCollector) collectMapStateMetric(
 	cfg *MetricConfig,
 	commonLabels []string,
 ) {
-	mapData := helpers.ExtractFieldMap(obj, cfg.Path)
+	// 记录开始处理
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"field_path":    cfg.Path,
+		"value_path":    cfg.ValuePath,
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Starting map_state metric collection")
 
+	mapData := helpers.ExtractFieldMap(obj, cfg.Path)
+	m
+
+	// 记录提取的 map 数据
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"field_path":    cfg.Path,
+		"map_size":      len(mapData),
+		"map_keys":      fmt.Sprintf("%v", getMapKeys(mapData)),
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Extracted map data from resource")
+
+	// 如果 map 为空，记录警告
+	if len(mapData) == 0 {
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"field_path":    cfg.Path,
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Warn("Map data is empty, no metrics will be generated")
+		return
+	}
+
+	metricsGenerated := 0
 	for key, entryData := range mapData {
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"map_key":       key,
+			"entry_type":    fmt.Sprintf("%T", entryData),
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Info("Processing map entry")
+
 		entryMap, ok := entryData.(map[string]any)
 		if !ok {
+			c.logger.WithFields(log.Fields{
+				"metric_name":   cfg.Name,
+				"map_key":       key,
+				"expected_type": "map[string]any",
+				"actual_type":   fmt.Sprintf("%T", entryData),
+				"entry_value":   fmt.Sprintf("%v", entryData),
+				"resource_name": obj.GetName(),
+				"namespace":     obj.GetNamespace(),
+			}).Warn("Entry is not a map, skipping")
 			continue
 		}
 
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"map_key":       key,
+			"entry_fields":  fmt.Sprintf("%v", getMapKeys(entryMap)),
+			"value_path":    cfg.ValuePath,
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Info("Entry is a valid map, extracting state")
+
 		currentState, _ := entryMap[cfg.ValuePath].(string)
+
+		// 记录状态提取结果
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"map_key":       key,
+			"value_path":    cfg.ValuePath,
+			"current_state": currentState,
+			"state_empty":   currentState == "",
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Info("Extracted state from entry")
 
 		// 只在有当前状态时发送指标
 		if currentState == "" {
+			c.logger.WithFields(log.Fields{
+				"metric_name":   cfg.Name,
+				"map_key":       key,
+				"value_path":    cfg.ValuePath,
+				"resource_name": obj.GetName(),
+				"namespace":     obj.GetNamespace(),
+			}).Warn("Current state is empty, skipping metric generation")
 			continue
 		}
 
@@ -319,8 +432,161 @@ func (c *CrdCollector) collectMapStateMetric(
 		copy(labels, commonLabels)
 		labels = append(labels, key, currentState)
 
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"map_key":       key,
+			"current_state": currentState,
+			"labels":        fmt.Sprintf("%v", labels),
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Info("Generating metric")
+
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1.0, labels...)
+		metricsGenerated++
 	}
+
+	// 记录总结信息
+	c.logger.WithFields(log.Fields{
+		"metric_name":       cfg.Name,
+		"field_path":        cfg.Path,
+		"total_entries":     len(mapData),
+		"metrics_generated": metricsGenerated,
+		"resource_name":     obj.GetName(),
+		"namespace":         obj.GetNamespace(),
+	}).Info("Completed map_state metric collection")
+}
+
+// 辅助函数：获取 map 的所有 key
+func getMapKeys(m map[string]any) []string {
+	if m == nil {
+		return []string{}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// collectStringStateMetric 收集 string 类型的状态指标
+// 用于从简单字符串字段提取状态值
+func (c *CrdCollector) collectStringStateMetric(
+	ch chan<- prometheus.Metric,
+	desc *prometheus.Desc,
+	obj *unstructured.Unstructured,
+	cfg *MetricConfig,
+	commonLabels []string,
+) {
+	// 记录开始处理
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"field_path":    cfg.Path,
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Starting string_state metric collection")
+
+	// 提取字符串值
+	value, found, err := unstructured.NestedString(obj.Object, strings.Split(cfg.Path, ".")...)
+	if err != nil {
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"field_path":    cfg.Path,
+			"error":         err.Error(),
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Warn("Failed to extract string value")
+		return
+	}
+
+	if !found {
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"field_path":    cfg.Path,
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Warn("String field not found")
+		return
+	}
+
+	// 记录提取到的值
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"field_path":    cfg.Path,
+		"value":         value,
+		"value_empty":   value == "",
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Extracted string value from resource")
+
+	// 如果值为空，跳过
+	if value == "" {
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"field_path":    cfg.Path,
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Warn("String value is empty, skipping metric generation")
+		return
+	}
+
+	// 查找值映射
+	metricValue := 0.0
+	if cfg.ValueMapping != nil {
+		if mappedValue, ok := cfg.ValueMapping[value]; ok {
+			metricValue = float64(mappedValue)
+			c.logger.WithFields(log.Fields{
+				"metric_name":   cfg.Name,
+				"string_value":  value,
+				"mapped_value":  metricValue,
+				"resource_name": obj.GetName(),
+				"namespace":     obj.GetNamespace(),
+			}).Info("Value mapped successfully")
+		} else {
+			c.logger.WithFields(log.Fields{
+				"metric_name":        cfg.Name,
+				"string_value":       value,
+				"available_mappings": getMapKeys(cfg.ValueMapping),
+				"resource_name":      obj.GetName(),
+				"namespace":          obj.GetNamespace(),
+			}).Warn("Value not found in mapping, skipping")
+			return
+		}
+	} else {
+		// 如果没有映射，默认值为 1
+		metricValue = 1.0
+		c.logger.WithFields(log.Fields{
+			"metric_name":   cfg.Name,
+			"string_value":  value,
+			"resource_name": obj.GetName(),
+			"namespace":     obj.GetNamespace(),
+		}).Info("No value mapping defined, using default value 1")
+	}
+
+	// 构建标签（包含状态值）
+	labels := make([]string, len(commonLabels), len(commonLabels)+1)
+	copy(labels, commonLabels)
+	labels = append(labels, value)
+
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"string_value":  value,
+		"metric_value":  metricValue,
+		"labels":        fmt.Sprintf("%v", labels),
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Generating metric")
+
+	// 发送指标
+	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, metricValue, labels...)
+
+	c.logger.WithFields(log.Fields{
+		"metric_name":   cfg.Name,
+		"field_path":    cfg.Path,
+		"string_value":  value,
+		"metric_value":  metricValue,
+		"resource_name": obj.GetName(),
+		"namespace":     obj.GetNamespace(),
+	}).Info("Completed string_state metric collection")
 }
 
 // collectMapGaugeMetric 收集 map_gauge 类型指标
