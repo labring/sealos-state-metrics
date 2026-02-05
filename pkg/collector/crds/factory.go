@@ -68,9 +68,11 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		if crdCfg.Name == "" {
 			return nil, fmt.Errorf("CRD config %d: name is required", i)
 		}
+
 		if crdCfg.GVR.Resource == "" {
 			return nil, fmt.Errorf("CRD config %s: gvr.resource is required", crdCfg.Name)
 		}
+
 		resourceStore := store.NewResourceStore(
 			factoryCtx.Logger.WithField("crd", crdCfg.Name),
 			nil,
@@ -83,6 +85,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			},
 			ResyncPeriod: crdCfg.ResyncPeriod,
 		}
+
 		i, err := informer.NewInformer(
 			dynamicClient,
 			&informerConfig,
@@ -92,6 +95,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize i for CRD %s: %w", crdCfg.Name, err)
 		}
+
 		crdCollector, err := NewCrdCollector(
 			crdCfg,
 			resourceStore,
@@ -102,14 +106,16 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		if err != nil {
 			return nil, err
 		}
+
 		c.crdCollectors = append(c.crdCollectors, crdCollector)
 	}
+
 	factoryCtx.Logger.WithField("count", len(c.crdCollectors)).Info("Created crd collectors")
 
-	//7. Init all crd collector Metrics
+	// 7. Init all crd collector Metrics
 	c.initMetrics()
 
-	//8. Set lifecycle hooks
+	// 8. Set lifecycle hooks
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
 			// Start all crdCollector informer to collect
@@ -119,7 +125,9 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 					return err
 				}
 			}
+
 			c.SetReady()
+
 			return nil
 		},
 		CollectFunc: c.collect,
@@ -131,9 +139,11 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 					return err
 				}
 			}
+
 			return nil
 		},
 	})
+
 	return c, nil
 }
 

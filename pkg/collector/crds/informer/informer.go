@@ -68,12 +68,15 @@ func NewInformer(
 	if resourceStore == nil {
 		return nil, errors.New("resource store cannot be nil")
 	}
+
 	if config.ResyncPeriod == 0 {
 		config.ResyncPeriod = 10 * time.Minute
 	}
+
 	if logger == nil {
 		logger = log.WithField("component", "informer")
 	}
+
 	informerLogger := logger.WithFields(log.Fields{
 		"gvr": config.GVR.String(),
 	})
@@ -94,12 +97,13 @@ func (i *Informer) Start(ctx context.Context) error {
 	}
 
 	i.logger.Info("Starting dynamic informer")
-	var factory dynamicinformer.DynamicSharedInformerFactory
-	factory = dynamicinformer.NewDynamicSharedInformerFactory(
+
+	factory := dynamicinformer.NewDynamicSharedInformerFactory(
 		i.dynamicClient,
 		i.config.ResyncPeriod,
 	)
 	i.logger.Debug("Created cluster-scoped informer factory")
+
 	i.informer = factory.ForResource(i.config.GVR).Informer()
 	if err := i.registerEventHandlers(); err != nil {
 		return fmt.Errorf("failed to register event handlers: %w", err)
@@ -110,6 +114,7 @@ func (i *Informer) Start(ctx context.Context) error {
 
 	// Wait for cache sync
 	i.logger.Info("Waiting for informer cache to sync")
+
 	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
 		close(i.informerStopCh)
 		i.informerStopCh = nil
@@ -183,6 +188,7 @@ func (i *Informer) registerEventHandlers() error {
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			oldU := i.extractUnstructured(oldObj)
+
 			newU := i.extractUnstructured(newObj)
 			if oldU != nil && newU != nil {
 				i.handleUpdate(oldU, newU)
@@ -195,12 +201,12 @@ func (i *Informer) registerEventHandlers() error {
 			}
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to add event handler: %w", err)
 	}
 
 	i.logger.Debug("Event handlers registered successfully")
+
 	return nil
 }
 
@@ -224,6 +230,7 @@ func (i *Informer) handleUpdate(oldObj, newObj *unstructured.Unstructured) {
 			"namespace": newObj.GetNamespace(),
 			"name":      newObj.GetName(),
 		}).Debug("Resource update ignored (same resource version)")
+
 		return
 	}
 
@@ -266,23 +273,27 @@ func (i *Informer) extractUnstructured(obj any) *unstructured.Unstructured {
 				"namespace": u.GetNamespace(),
 				"name":      u.GetName(),
 			}).Debug("Extracted object from tombstone")
+
 			return u
 		}
 
 		i.logger.WithField("object", tombstone.Obj).
 			Error("Tombstone contained object that is not Unstructured")
+
 		return nil
 	}
 
 	// Unrecognized type
 	i.logger.WithField("object_type", fmt.Sprintf("%T", obj)).
 		Error("Failed to extract Unstructured from object")
+
 	return nil
 }
 
 // logInitialStats logs initial statistics.
 func (i *Informer) logInitialStats() {
 	storeLen := i.store.Len()
+
 	cacheLen := 0
 	if i.informer != nil && i.informer.GetStore() != nil {
 		cacheLen = len(i.informer.GetStore().List())
@@ -337,9 +348,12 @@ func (i *Informer) Resync() error {
 	if !i.started {
 		return errors.New("informer not started")
 	}
+
 	if i.informer == nil {
 		return errors.New("informer not initialized")
 	}
+
 	i.logger.Info("Triggering manual resync")
+
 	return nil
 }

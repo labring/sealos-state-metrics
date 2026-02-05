@@ -2,7 +2,7 @@
 package crds
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector/crds/helpers"
@@ -49,15 +49,15 @@ func NewCrdCollector(
 ) (*CrdCollector, error) {
 	// Validate parameters
 	if crdConfig == nil {
-		return nil, fmt.Errorf("crdConfig cannot be nil")
+		return nil, errors.New("crdConfig cannot be nil")
 	}
 
 	if resourceStore == nil {
-		return nil, fmt.Errorf("resource store cannot be nil")
+		return nil, errors.New("resource store cannot be nil")
 	}
 
 	if informer == nil {
-		return nil, fmt.Errorf("informer cannot be nil")
+		return nil, errors.New("informer cannot be nil")
 	}
 
 	if metricPrefix == "" {
@@ -83,11 +83,7 @@ func NewCrdCollector(
 		descriptors:  make(map[string]*prometheus.Desc),
 	}
 
-	// Build metric descriptors
-	if err := collector.buildDescriptors(); err != nil {
-		return nil, fmt.Errorf("failed to build descriptors: %w", err)
-	}
-
+	collector.buildDescriptors()
 	collectorLogger.WithField("metric_count", len(collector.descriptors)).
 		Info("CRD collector initialized")
 
@@ -163,52 +159,47 @@ func (c *CrdCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // buildDescriptors builds descriptors for all metrics.
-func (c *CrdCollector) buildDescriptors() error {
+func (c *CrdCollector) buildDescriptors() {
 	// Get sorted common label names (sorting ensures consistent order)
 	commonLabelNames := helpers.GetSortedKeys(c.crdConfig.CommonLabels)
 
 	for _, metricCfg := range c.crdConfig.Metrics {
-		var labelNames []string
-		var desc *prometheus.Desc
+		var (
+			desc       *prometheus.Desc
+			labelNames []string
+		)
 
-		// Build label list based on metric type
 		switch metricCfg.Type {
 		case "info":
-			// info type: common labels + additional labels
-			labelNames = make([]string, len(commonLabelNames))
+			labelNames = make(
+				[]string,
+				len(commonLabelNames),
+				len(commonLabelNames)+len(metricCfg.Labels),
+			)
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, helpers.GetSortedKeys(metricCfg.Labels)...)
-
 		case "gauge":
-			// gauge type: only common labels
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
-
 		case "count":
-			// count type: only one label (field value)
-			labelNames = []string{"value"}
+			labelNames = make([]string, 1)
+			labelNames[0] = "value"
 		case "string_state":
-			labelNames = make([]string, len(commonLabelNames))
+			labelNames = make([]string, len(commonLabelNames), len(commonLabelNames)+1)
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "state")
 		case "map_state":
-			// map_state type: common labels + key + state
-			labelNames = make([]string, len(commonLabelNames))
+			labelNames = make([]string, len(commonLabelNames), len(commonLabelNames)+2)
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "key", "state")
-
 		case "map_gauge":
-			// map_gauge type: common labels + key
-			labelNames = make([]string, len(commonLabelNames))
+			labelNames = make([]string, len(commonLabelNames), len(commonLabelNames)+1)
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "key")
-
 		case "conditions":
-			// conditions type: common labels + type + status + reason
-			labelNames = make([]string, len(commonLabelNames))
+			labelNames = make([]string, len(commonLabelNames), len(commonLabelNames)+3)
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "type", "status", "reason")
-
 		default:
 			c.logger.WithField("type", metricCfg.Type).Warn("Unknown metric type, skipping")
 			continue
@@ -233,8 +224,6 @@ func (c *CrdCollector) buildDescriptors() error {
 			"label_count": len(labelNames),
 		}).Debug("Metric descriptor created")
 	}
-
-	return nil
 }
 
 // collectInfoMetric collects info type metrics.
@@ -337,6 +326,7 @@ func (c *CrdCollector) collectStringStateMetric(
 	metricValue := 1.0
 	labels := make([]string, len(commonLabels)+1)
 	copy(labels, commonLabels)
+
 	labels[len(commonLabels)] = stringData
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, metricValue, labels...)
 }
@@ -390,9 +380,11 @@ func (c *CrdCollector) collectConditionsMetric(
 		if cfg.Condition.TypeField != "" {
 			typeField = cfg.Condition.TypeField
 		}
+
 		if cfg.Condition.StatusField != "" {
 			statusField = cfg.Condition.StatusField
 		}
+
 		if cfg.Condition.ReasonField != "" {
 			reasonField = cfg.Condition.ReasonField
 		}

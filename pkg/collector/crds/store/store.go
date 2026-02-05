@@ -293,6 +293,7 @@ func (s *ResourceStore) Contains(namespace, name string) bool {
 
 	key := s.makeKey(namespace, name)
 	_, exists := s.resources[key]
+
 	return exists
 }
 
@@ -348,5 +349,6 @@ func (s *ResourceStore) GetKeys() []string {
 	for key := range s.resources {
 		keys = append(keys, key)
 	}
+
 	return keys
 }
