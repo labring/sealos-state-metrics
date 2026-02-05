@@ -1,4 +1,4 @@
-package dynamic
+package crds
 
 import "time"
 
@@ -84,8 +84,8 @@ type ConditionConfig struct {
 	ReasonField string `yaml:"reasonField"`
 }
 
-// NewDefaultCollectorConfig creates a new CollectorConfig with default values
-func NewDefaultCollectorConfig() *CollectorConfig {
+// NewDefaultConfig creates a new CollectorConfig with default values
+func NewDefaultConfig() *CollectorConfig {
 	return &CollectorConfig{
 		CRDs: []CRDConfig{},
 	}

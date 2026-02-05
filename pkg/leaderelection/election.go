@@ -1,3 +1,4 @@
+// Package leaderelection manages leader election for high availability.
 package leaderelection
 
 import (

@@ -1,4 +1,4 @@
-package dynamic
+package helpers
 
 import (
 	"sort"
@@ -8,8 +8,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// extractFieldString extracts a string field from an unstructured object using a JSONPath
-func extractFieldString(obj *unstructured.Unstructured, path string) string {
+// ExtractFieldString extracts a string field from an unstructured object using a JSONPath
+func ExtractFieldString(obj *unstructured.Unstructured, path string) string {
 	if path == "" {
 		return ""
 	}
@@ -20,8 +20,8 @@ func extractFieldString(obj *unstructured.Unstructured, path string) string {
 	return value
 }
 
-// extractFieldFloat extracts a float field from an unstructured object
-func extractFieldFloat(obj *unstructured.Unstructured, path string) float64 {
+// ExtractFieldFloat extracts a float field from an unstructured object
+func ExtractFieldFloat(obj *unstructured.Unstructured, path string) float64 {
 	if path == "" {
 		return 0
 	}
@@ -33,11 +33,11 @@ func extractFieldFloat(obj *unstructured.Unstructured, path string) float64 {
 		return 0
 	}
 
-	return toFloat64(value)
+	return ToFloat64(value)
 }
 
-// extractFieldMap extracts a map field from an unstructured object
-func extractFieldMap(obj *unstructured.Unstructured, path string) map[string]any {
+// ExtractFieldMap extracts a map field from an unstructured object
+func ExtractFieldMap(obj *unstructured.Unstructured, path string) map[string]any {
 	if path == "" {
 		return nil
 	}
@@ -52,8 +52,8 @@ func extractFieldMap(obj *unstructured.Unstructured, path string) map[string]any
 	return value
 }
 
-// extractFieldSlice extracts a slice field from an unstructured object
-func extractFieldSlice(obj *unstructured.Unstructured, path string) []any {
+// ExtractFieldSlice extracts a slice field from an unstructured object
+func ExtractFieldSlice(obj *unstructured.Unstructured, path string) []any {
 	if path == "" {
 		return nil
 	}
@@ -68,8 +68,8 @@ func extractFieldSlice(obj *unstructured.Unstructured, path string) []any {
 	return value
 }
 
-// toFloat64 converts various types to float64
-func toFloat64(value any) float64 {
+// ToFloat64 converts various types to float64
+func ToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case float64:
 		return v
@@ -114,8 +114,8 @@ func sanitizeName(name string) string {
 	return strings.ToLower(result)
 }
 
-// getSortedKeys returns sorted keys from a map
-func getSortedKeys(m map[string]string) []string {
+// GetSortedKeys returns sorted keys from a map
+func GetSortedKeys(m map[string]string) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -126,9 +126,9 @@ func getSortedKeys(m map[string]string) []string {
 	return keys
 }
 
-// getSortedValues returns values in sorted key order from a map
-func getSortedValues(m map[string]string) []string {
-	keys := getSortedKeys(m)
+// GetSortedValues returns values in sorted key order from a map
+func GetSortedValues(m map[string]string) []string {
+	keys := GetSortedKeys(m)
 
 	values := make([]string, len(keys))
 	for i, k := range keys {

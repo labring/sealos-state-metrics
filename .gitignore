@@ -4,3 +4,10 @@
 /bin
 **/*.local
 **/*.local.*
+/53.yml
+/.idea/go.imports.xml
+/.idea/golinter.xml
+/.idea/modules.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/sealos-state-metrics.iml
+/.idea/vcs.xml

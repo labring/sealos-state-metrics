@@ -1,5 +1,5 @@
 //nolint:testpackage // Tests need access to private functions
-package dynamic
+package helpers
 
 import (
 	"testing"
@@ -56,7 +56,7 @@ func TestExtractFieldString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractFieldString(tt.obj, tt.path)
+			got := ExtractFieldString(tt.obj, tt.path)
 			if got != tt.expected {
 				t.Errorf("extractFieldString() = %v, want %v", got, tt.expected)
 			}
@@ -105,7 +105,7 @@ func TestExtractFieldFloat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractFieldFloat(tt.obj, tt.path)
+			got := ExtractFieldFloat(tt.obj, tt.path)
 			if got != tt.expected {
 				t.Errorf("extractFieldFloat() = %v, want %v", got, tt.expected)
 			}
@@ -136,7 +136,7 @@ func TestToFloat64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := toFloat64(tt.value)
+			got := ToFloat64(tt.value)
 			if got != tt.expected {
 				t.Errorf("toFloat64(%v) = %v, want %v", tt.value, got, tt.expected)
 			}
@@ -200,15 +200,15 @@ func TestGetSortedKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getSortedKeys(tt.input)
+			got := GetSortedKeys(tt.input)
 			if len(got) != len(tt.expected) {
-				t.Errorf("len(getSortedKeys()) = %d, want %d", len(got), len(tt.expected))
+				t.Errorf("len(GetSortedKeys()) = %d, want %d", len(got), len(tt.expected))
 				return
 			}
 
 			for i := range got {
 				if got[i] != tt.expected[i] {
-					t.Errorf("getSortedKeys()[%d] = %q, want %q", i, got[i], tt.expected[i])
+					t.Errorf("GetSortedKeys()[%d] = %q, want %q", i, got[i], tt.expected[i])
 				}
 			}
 		})

@@ -1,3 +1,4 @@
+// Package identity provides instance identity detection.
 package identity
 
 import (
@@ -9,7 +10,9 @@ import (
 )
 
 var (
-	once     sync.Once
+	// once ensures identity is computed only once
+	once sync.Once
+	// instance stores the computed identity
 	instance string
 )
 
