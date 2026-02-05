@@ -560,8 +560,8 @@ github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD
 github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/billing v1.3.39 h1:iJFhv4Z/EdTWeJ3INDX+nK7qoP7G5JF8NMsxcCZe7eY=
 github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/billing v1.3.39/go.mod h1:pQUClJeCf2vHSzhWkTM0rhC502Ac65S6G1WDWK/GiJ0=
 github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.39/go.mod h1:r5r4xbfxSaeR04b166HGsBa/R4U3SueirEUpXGuw+Q0=
-github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.41 h1:i3dGQjQFqKfw3hO8cwz4Xavdb+AF+LhHNl0WeXB0avk=
-github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.41/go.mod h1:r5r4xbfxSaeR04b166HGsBa/R4U3SueirEUpXGuw+Q0=
+github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.45 h1:q+zQKfZNmDaxWk/EmlVqjPYU79OzwH25n7piyZP4jwk=
+github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.45/go.mod h1:r5r4xbfxSaeR04b166HGsBa/R4U3SueirEUpXGuw+Q0=
 github.com/tjfoc/gmsm v1.3.2/go.mod h1:HaUcFuY0auTiaHB9MHFGCPx5IaLhTUd2atbCFBQXn9w=
 github.com/tjfoc/gmsm v1.4.1 h1:aMe1GlZb+0bLjn+cKTPEvvn9oUEBlJitaZiiBwsbgho=
 github.com/tjfoc/gmsm v1.4.1/go.mod h1:j4INPkHWMrhJb38G+J6W4Tw0AbuN8Thu3PbdVYhVcTE=
