@@ -13,33 +13,33 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// CrdCollector Prometheus 指标收集器
-// 职责：从 ResourceStore 读取资源并生成 Prometheus 指标
+// CrdCollector implements Prometheus metrics collection.
+// Responsibilities: Reads resources from ResourceStore and generates Prometheus metrics.
 type CrdCollector struct {
-	// 配置
+	// Configuration
 	crdConfig    *CRDConfig
 	metricPrefix string
 
-	// 指标描述符（在初始化时构建）
+	// Metric descriptors (built during initialization)
 	descriptors map[string]*prometheus.Desc
 
-	// 存储层引用（只读依赖）
+	// Storage layer reference (read-only dependency)
 	store *store.ResourceStore
 
-	// Informer 引用（用于健康检查）
+	// Informer reference (for health checks)
 	informer *informer.Informer
 
-	// 日志
+	// Logger instance
 	logger *log.Entry
 }
 
-// NewCrdCollector 创建新的 CRD 收集器
-// 参数：
-//   - crdConfig: CRD 指标配置
-//   - resourceStore: 资源存储层（依赖注入）
-//   - informer: Informer 实例（用于健康检查）
-//   - metricPrefix: 指标名称前缀
-//   - logger: 日志记录器
+// NewCrdCollector creates a new CRD collector.
+// Parameters:
+//   - crdConfig: CRD metrics configuration
+//   - resourceStore: Resource storage layer (dependency injection)
+//   - informer: Informer instance (for health checks)
+//   - metricPrefix: Metric name prefix
+//   - logger: Logger instance
 func NewCrdCollector(
 	crdConfig *CRDConfig,
 	resourceStore *store.ResourceStore,
@@ -47,7 +47,7 @@ func NewCrdCollector(
 	metricPrefix string,
 	logger *log.Entry,
 ) (*CrdCollector, error) {
-	// 参数验证
+	// Validate parameters
 	if crdConfig == nil {
 		return nil, fmt.Errorf("crdConfig cannot be nil")
 	}
@@ -61,10 +61,10 @@ func NewCrdCollector(
 	}
 
 	if metricPrefix == "" {
-		metricPrefix = "sealos" // 默认前缀
+		metricPrefix = "sealos" // Default prefix
 	}
 
-	// 创建日志记录器
+	// Create logger instance
 	if logger == nil {
 		logger = log.WithField("component", "crd_collector")
 	}
@@ -83,7 +83,7 @@ func NewCrdCollector(
 		descriptors:  make(map[string]*prometheus.Desc),
 	}
 
-	// 构建指标描述符
+	// Build metric descriptors
 	if err := collector.buildDescriptors(); err != nil {
 		return nil, fmt.Errorf("failed to build descriptors: %w", err)
 	}
@@ -94,34 +94,34 @@ func NewCrdCollector(
 	return collector, nil
 }
 
-// Describe 实现 prometheus.Collector 接口
-// 发送所有可能的指标描述符
+// Describe implements prometheus.Collector interface.
+// Sends all possible metric descriptors.
 func (c *CrdCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, desc := range c.descriptors {
 		ch <- desc
 	}
 }
 
-// Collect 实现 prometheus.Collector 接口
-// 收集并发送所有指标
+// Collect implements prometheus.Collector interface.
+// Collects and sends all metrics.
 func (c *CrdCollector) Collect(ch chan<- prometheus.Metric) {
-	// 检查 Informer 是否已同步
+	// Check if Informer cache is synced
 	if !c.informer.HasSynced() {
 		c.logger.Warn("Informer cache not synced, skipping collection")
 		return
 	}
 
-	// 从 ResourceStore 读取所有资源
+	// Read all resources from ResourceStore
 	resources := c.store.List()
 
 	c.logger.WithField("resource_count", len(resources)).Debug("Starting metric collection")
 
-	// 第一遍：收集每个资源的指标
+	// First pass: collect metrics for each resource
 	for _, obj := range resources {
-		// 提取通用标签
+		// Extract common labels
 		commonLabels := c.extractCommonLabels(obj)
 
-		// 收集每个配置的指标
+		// Collect each configured metric
 		for _, metricCfg := range c.crdConfig.Metrics {
 			desc, ok := c.descriptors[metricCfg.Name]
 			if !ok {
@@ -145,7 +145,7 @@ func (c *CrdCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	// 第二遍：收集聚合指标（count 类型）
+	// Second pass: collect aggregate metrics (count type)
 	for _, metricCfg := range c.crdConfig.Metrics {
 		if metricCfg.Type != "count" {
 			continue
@@ -162,51 +162,49 @@ func (c *CrdCollector) Collect(ch chan<- prometheus.Metric) {
 	c.logger.Debug("Metric collection completed")
 }
 
-// buildDescriptors 构建所有指标的描述符
+// buildDescriptors builds descriptors for all metrics.
 func (c *CrdCollector) buildDescriptors() error {
-	// 获取通用标签名称列表（需要排序以保证顺序一致）
+	// Get sorted common label names (sorting ensures consistent order)
 	commonLabelNames := helpers.GetSortedKeys(c.crdConfig.CommonLabels)
 
 	for _, metricCfg := range c.crdConfig.Metrics {
 		var labelNames []string
 		var desc *prometheus.Desc
 
-		// 根据指标类型构建标签列表
+		// Build label list based on metric type
 		switch metricCfg.Type {
 		case "info":
-			// info 类型：通用标签 + 额外标签
+			// info type: common labels + additional labels
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, helpers.GetSortedKeys(metricCfg.Labels)...)
 
 		case "gauge":
-			// gauge 类型：只有通用标签
+			// gauge type: only common labels
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
 
 		case "count":
-			// count 类型：只有一个标签（字段值）
+			// count type: only one label (field value)
 			labelNames = []string{"value"}
 		case "string_state":
-			// map_state 类型：通用标签 + key + state
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
-			labelNames = append(labelNames, "key", "state")
-
+			labelNames = append(labelNames, "state")
 		case "map_state":
-			// map_state 类型：通用标签 + key + state
+			// map_state type: common labels + key + state
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "key", "state")
 
 		case "map_gauge":
-			// map_gauge 类型：通用标签 + key
+			// map_gauge type: common labels + key
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "key")
 
 		case "conditions":
-			// conditions 类型：通用标签 + type + status + reason
+			// conditions type: common labels + type + status + reason
 			labelNames = make([]string, len(commonLabelNames))
 			copy(labelNames, commonLabelNames)
 			labelNames = append(labelNames, "type", "status", "reason")
@@ -216,15 +214,15 @@ func (c *CrdCollector) buildDescriptors() error {
 			continue
 		}
 
-		// 构建完整的指标名称
+		// Build full metric name
 		fullMetricName := prometheus.BuildFQName(c.metricPrefix, "", metricCfg.Name)
 
-		// 创建描述符
+		// Create descriptor
 		desc = prometheus.NewDesc(
 			fullMetricName,
 			metricCfg.Help,
 			labelNames,
-			nil, // 不使用 ConstLabels
+			nil, // Do not use ConstLabels
 		)
 
 		c.descriptors[metricCfg.Name] = desc
@@ -239,8 +237,8 @@ func (c *CrdCollector) buildDescriptors() error {
 	return nil
 }
 
-// collectInfoMetric 收集 info 类型指标
-// info 指标的值始终为 1，用于暴露标签信息
+// collectInfoMetric collects info type metrics.
+// Info metrics always have a value of 1, used to expose label information.
 func (c *CrdCollector) collectInfoMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -251,7 +249,7 @@ func (c *CrdCollector) collectInfoMetric(
 	labels := make([]string, len(commonLabels), len(commonLabels)+len(cfg.Labels))
 	copy(labels, commonLabels)
 
-	// 添加额外标签
+	// Add additional labels
 	for _, path := range helpers.GetSortedValues(cfg.Labels) {
 		value := helpers.ExtractFieldString(obj, path)
 		labels = append(labels, value)
@@ -260,8 +258,8 @@ func (c *CrdCollector) collectInfoMetric(
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1, labels...)
 }
 
-// collectGaugeMetric 收集 gauge 类型指标
-// 从指定路径提取数值
+// collectGaugeMetric collects gauge type metrics.
+// Extracts numeric value from specified path.
 func (c *CrdCollector) collectGaugeMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -274,15 +272,15 @@ func (c *CrdCollector) collectGaugeMetric(
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, value, commonLabels...)
 }
 
-// collectCountMetric 收集 count 类型指标（聚合指标）
-// 统计每个不同字段值的资源数量
+// collectCountMetric collects count type metrics (aggregate metrics).
+// Counts the number of resources for each distinct field value.
 func (c *CrdCollector) collectCountMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
 	cfg *MetricConfig,
 	resources []*unstructured.Unstructured,
 ) {
-	// 按字段值统计资源数量
+	// Count resources by field value
 	valueCounts := make(map[string]float64)
 
 	for _, obj := range resources {
@@ -292,44 +290,12 @@ func (c *CrdCollector) collectCountMetric(
 		}
 	}
 
-	// 为每个发现的值发送指标
+	// Send metrics for each discovered value
 	for value, count := range valueCounts {
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, count, value)
 	}
 }
 
-// func (c *CrdCollector) collectMapStateMetric(
-// 	ch chan<- prometheus.Metric,
-// 	desc *prometheus.Desc,
-// 	obj *unstructured.Unstructured,
-// 	cfg *MetricConfig,
-// 	commonLabels []string,
-// ) {
-// 	mapData := helpers.ExtractFieldMap(obj, cfg.Path)
-//
-// 	for key, entryData := range mapData {
-// 		entryMap, ok := entryData.(map[string]any)
-// 		if !ok {
-// 			continue
-// 		}
-//
-// 		currentState, _ := entryMap[cfg.ValuePath].(string)
-//
-// 		// 只在有当前状态时发送指标
-// 		if currentState == "" {
-// 			continue
-// 		}
-//
-// 		labels := make([]string, len(commonLabels), len(commonLabels)+2)
-// 		copy(labels, commonLabels)
-// 		labels = append(labels, key, currentState)
-//
-// 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1.0, labels...)
-// 	}
-// }
-
-// collectMapStateMetric 收集 map_state 类型指标
-// 用于暴露 map 中每个条目的状态，值为 1
 func (c *CrdCollector) collectMapStateMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -337,94 +303,18 @@ func (c *CrdCollector) collectMapStateMetric(
 	cfg *MetricConfig,
 	commonLabels []string,
 ) {
-	// 记录开始处理
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"field_path":    cfg.Path,
-		"value_path":    cfg.ValuePath,
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Starting map_state metric collection")
-
 	mapData := helpers.ExtractFieldMap(obj, cfg.Path)
-	m
 
-	// 记录提取的 map 数据
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"field_path":    cfg.Path,
-		"map_size":      len(mapData),
-		"map_keys":      fmt.Sprintf("%v", getMapKeys(mapData)),
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Extracted map data from resource")
-
-	// 如果 map 为空，记录警告
-	if len(mapData) == 0 {
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"field_path":    cfg.Path,
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Warn("Map data is empty, no metrics will be generated")
-		return
-	}
-
-	metricsGenerated := 0
 	for key, entryData := range mapData {
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"map_key":       key,
-			"entry_type":    fmt.Sprintf("%T", entryData),
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Info("Processing map entry")
-
 		entryMap, ok := entryData.(map[string]any)
 		if !ok {
-			c.logger.WithFields(log.Fields{
-				"metric_name":   cfg.Name,
-				"map_key":       key,
-				"expected_type": "map[string]any",
-				"actual_type":   fmt.Sprintf("%T", entryData),
-				"entry_value":   fmt.Sprintf("%v", entryData),
-				"resource_name": obj.GetName(),
-				"namespace":     obj.GetNamespace(),
-			}).Warn("Entry is not a map, skipping")
 			continue
 		}
 
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"map_key":       key,
-			"entry_fields":  fmt.Sprintf("%v", getMapKeys(entryMap)),
-			"value_path":    cfg.ValuePath,
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Info("Entry is a valid map, extracting state")
-
 		currentState, _ := entryMap[cfg.ValuePath].(string)
 
-		// 记录状态提取结果
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"map_key":       key,
-			"value_path":    cfg.ValuePath,
-			"current_state": currentState,
-			"state_empty":   currentState == "",
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Info("Extracted state from entry")
-
-		// 只在有当前状态时发送指标
+		// Only send metric when current state exists
 		if currentState == "" {
-			c.logger.WithFields(log.Fields{
-				"metric_name":   cfg.Name,
-				"map_key":       key,
-				"value_path":    cfg.ValuePath,
-				"resource_name": obj.GetName(),
-				"namespace":     obj.GetNamespace(),
-			}).Warn("Current state is empty, skipping metric generation")
 			continue
 		}
 
@@ -432,44 +322,10 @@ func (c *CrdCollector) collectMapStateMetric(
 		copy(labels, commonLabels)
 		labels = append(labels, key, currentState)
 
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"map_key":       key,
-			"current_state": currentState,
-			"labels":        fmt.Sprintf("%v", labels),
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Info("Generating metric")
-
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, 1.0, labels...)
-		metricsGenerated++
 	}
-
-	// 记录总结信息
-	c.logger.WithFields(log.Fields{
-		"metric_name":       cfg.Name,
-		"field_path":        cfg.Path,
-		"total_entries":     len(mapData),
-		"metrics_generated": metricsGenerated,
-		"resource_name":     obj.GetName(),
-		"namespace":         obj.GetNamespace(),
-	}).Info("Completed map_state metric collection")
 }
 
-// 辅助函数：获取 map 的所有 key
-func getMapKeys(m map[string]any) []string {
-	if m == nil {
-		return []string{}
-	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// collectStringStateMetric 收集 string 类型的状态指标
-// 用于从简单字符串字段提取状态值
 func (c *CrdCollector) collectStringStateMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -477,120 +333,16 @@ func (c *CrdCollector) collectStringStateMetric(
 	cfg *MetricConfig,
 	commonLabels []string,
 ) {
-	// 记录开始处理
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"field_path":    cfg.Path,
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Starting string_state metric collection")
-
-	// 提取字符串值
-	value, found, err := unstructured.NestedString(obj.Object, strings.Split(cfg.Path, ".")...)
-	if err != nil {
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"field_path":    cfg.Path,
-			"error":         err.Error(),
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Warn("Failed to extract string value")
-		return
-	}
-
-	if !found {
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"field_path":    cfg.Path,
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Warn("String field not found")
-		return
-	}
-
-	// 记录提取到的值
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"field_path":    cfg.Path,
-		"value":         value,
-		"value_empty":   value == "",
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Extracted string value from resource")
-
-	// 如果值为空，跳过
-	if value == "" {
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"field_path":    cfg.Path,
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Warn("String value is empty, skipping metric generation")
-		return
-	}
-
-	// 查找值映射
-	metricValue := 0.0
-	if cfg.ValueMapping != nil {
-		if mappedValue, ok := cfg.ValueMapping[value]; ok {
-			metricValue = float64(mappedValue)
-			c.logger.WithFields(log.Fields{
-				"metric_name":   cfg.Name,
-				"string_value":  value,
-				"mapped_value":  metricValue,
-				"resource_name": obj.GetName(),
-				"namespace":     obj.GetNamespace(),
-			}).Info("Value mapped successfully")
-		} else {
-			c.logger.WithFields(log.Fields{
-				"metric_name":        cfg.Name,
-				"string_value":       value,
-				"available_mappings": getMapKeys(cfg.ValueMapping),
-				"resource_name":      obj.GetName(),
-				"namespace":          obj.GetNamespace(),
-			}).Warn("Value not found in mapping, skipping")
-			return
-		}
-	} else {
-		// 如果没有映射，默认值为 1
-		metricValue = 1.0
-		c.logger.WithFields(log.Fields{
-			"metric_name":   cfg.Name,
-			"string_value":  value,
-			"resource_name": obj.GetName(),
-			"namespace":     obj.GetNamespace(),
-		}).Info("No value mapping defined, using default value 1")
-	}
-
-	// 构建标签（包含状态值）
-	labels := make([]string, len(commonLabels), len(commonLabels)+1)
+	stringData := helpers.ExtractFieldString(obj, cfg.Path)
+	metricValue := 1.0
+	labels := make([]string, len(commonLabels)+1)
 	copy(labels, commonLabels)
-	labels = append(labels, value)
-
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"string_value":  value,
-		"metric_value":  metricValue,
-		"labels":        fmt.Sprintf("%v", labels),
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Generating metric")
-
-	// 发送指标
+	labels[len(commonLabels)] = stringData
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, metricValue, labels...)
-
-	c.logger.WithFields(log.Fields{
-		"metric_name":   cfg.Name,
-		"field_path":    cfg.Path,
-		"string_value":  value,
-		"metric_value":  metricValue,
-		"resource_name": obj.GetName(),
-		"namespace":     obj.GetNamespace(),
-	}).Info("Completed string_state metric collection")
 }
 
-// collectMapGaugeMetric 收集 map_gauge 类型指标
-// 用于暴露 map 中每个条目的数值
+// collectMapGaugeMetric collects map_gauge type metrics.
+// Exposes numeric values for each entry in the map.
 func (c *CrdCollector) collectMapGaugeMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -619,8 +371,8 @@ func (c *CrdCollector) collectMapGaugeMetric(
 	}
 }
 
-// collectConditionsMetric 收集 conditions 类型指标
-// 用于暴露 K8s 风格的 conditions 数组
+// collectConditionsMetric collects conditions type metrics.
+// Exposes Kubernetes-style conditions array.
 func (c *CrdCollector) collectConditionsMetric(
 	ch chan<- prometheus.Metric,
 	desc *prometheus.Desc,
@@ -628,12 +380,12 @@ func (c *CrdCollector) collectConditionsMetric(
 	cfg *MetricConfig,
 	commonLabels []string,
 ) {
-	// 默认字段名
+	// Default field names
 	typeField := "type"
 	statusField := "status"
 	reasonField := "reason"
 
-	// 使用配置的字段名（如果有）
+	// Use configured field names if provided
 	if cfg.Condition != nil {
 		if cfg.Condition.TypeField != "" {
 			typeField = cfg.Condition.TypeField
@@ -666,7 +418,7 @@ func (c *CrdCollector) collectConditionsMetric(
 		copy(labels, commonLabels)
 		labels = append(labels, condType, condStatus, condReason)
 
-		// 状态为 "True" 时值为 1，否则为 0
+		// Value is 1 when status is "True", otherwise 0
 		value := 0.0
 		if strings.EqualFold(condStatus, "true") {
 			value = 1.0
@@ -676,11 +428,8 @@ func (c *CrdCollector) collectConditionsMetric(
 	}
 }
 
-// extractCommonLabels 从对象中提取通用标签值
 func (c *CrdCollector) extractCommonLabels(obj *unstructured.Unstructured) []string {
 	labels := make([]string, 0, len(c.crdConfig.CommonLabels))
-
-	// 按排序后的键顺序提取标签值
 	for _, path := range helpers.GetSortedValues(c.crdConfig.CommonLabels) {
 		value := helpers.ExtractFieldString(obj, path)
 		labels = append(labels, value)
@@ -689,17 +438,17 @@ func (c *CrdCollector) extractCommonLabels(obj *unstructured.Unstructured) []str
 	return labels
 }
 
-// GetMetricCount 返回配置的指标数量
+// GetMetricCount returns the number of configured metrics.
 func (c *CrdCollector) GetMetricCount() int {
 	return len(c.descriptors)
 }
 
-// GetResourceCount 返回当前缓存的资源数量
+// GetResourceCount returns the number of currently cached resources.
 func (c *CrdCollector) GetResourceCount() int {
 	return c.store.Len()
 }
 
-// LogStats 输出收集器统计信息（用于调试）
+// LogStats outputs collector statistics (for debugging).
 func (c *CrdCollector) LogStats() {
 	storeMetrics := c.store.GetMetrics()
 

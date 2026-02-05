@@ -1,3 +1,4 @@
+// Package database provides database connection and pool management.
 package database
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PoolConfig contains PostgreSQL connection pool configuration.
 type PoolConfig struct {
 	MaxConns          int32
 	MinConns          int32
@@ -17,6 +19,7 @@ type PoolConfig struct {
 	PingTimeout       time.Duration
 }
 
+// DefaultPoolConfig returns default pool configuration.
 func DefaultPoolConfig() *PoolConfig {
 	return &PoolConfig{
 		MaxConns:          25,
@@ -28,44 +31,52 @@ func DefaultPoolConfig() *PoolConfig {
 	}
 }
 
+// PoolOption is a functional option for configuring PoolConfig.
 type PoolOption func(*PoolConfig)
 
+// WithMaxConns sets the maximum number of connections in the pool.
 func WithMaxConns(n int32) PoolOption {
 	return func(c *PoolConfig) {
 		c.MaxConns = n
 	}
 }
 
+// WithMinConns sets the minimum number of connections in the pool.
 func WithMinConns(n int32) PoolOption {
 	return func(c *PoolConfig) {
 		c.MinConns = n
 	}
 }
 
+// WithMaxConnLifetime sets the maximum lifetime of connections in the pool.
 func WithMaxConnLifetime(d time.Duration) PoolOption {
 	return func(c *PoolConfig) {
 		c.MaxConnLifetime = d
 	}
 }
 
+// WithMaxConnIdleTime sets the maximum idle time for connections in the pool.
 func WithMaxConnIdleTime(d time.Duration) PoolOption {
 	return func(c *PoolConfig) {
 		c.MaxConnIdleTime = d
 	}
 }
 
+// WithHealthCheckPeriod sets the period between health checks.
 func WithHealthCheckPeriod(d time.Duration) PoolOption {
 	return func(c *PoolConfig) {
 		c.HealthCheckPeriod = d
 	}
 }
 
+// WithPingTimeout sets the timeout for database ping operations.
 func WithPingTimeout(d time.Duration) PoolOption {
 	return func(c *PoolConfig) {
 		c.PingTimeout = d
 	}
 }
 
+// InitPgClient initializes a PostgreSQL connection pool with the given DSN and options.
 func InitPgClient(ctx context.Context, dsn string, opts ...PoolOption) (*pgxpool.Pool, error) {
 	poolConfig := DefaultPoolConfig()
 

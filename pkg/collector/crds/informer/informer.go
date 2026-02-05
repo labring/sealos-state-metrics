@@ -16,47 +16,47 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// Informer K8s 资源监听器
-// 职责：监听 K8s API 资源变化并同步到 ResourceStore
+// Informer watches Kubernetes resources.
+// Responsibilities: Monitors K8s API resource changes and syncs to ResourceStore.
 type Informer struct {
-	// K8s 相关
+	// Kubernetes related
 	config        *InformerConfig
 	dynamicClient dynamic.Interface
 	informer      cache.SharedIndexInformer
 
-	// 生命周期管理
+	// Lifecycle management
 	informerStopCh chan struct{}
 	started        bool
 
-	// 存储层引用（核心依赖）
+	// Storage layer reference (core dependency)
 	store *store.ResourceStore
 
-	// 日志
+	// Logger instance
 	logger *log.Entry
 }
 
-// InformerConfig 监听器配置
+// InformerConfig configures the informer.
 type InformerConfig struct {
-	// GVR 是要监听的资源类型
+	// GVR is the resource type to watch
 	GVR schema.GroupVersionResource
 
-	// 重新同步周期
+	// Resync period
 	ResyncPeriod time.Duration
 }
 
-// NewInformer 创建新的 Informer
-// 参数：
-//   - dynamicClient: K8s 动态客户端
-//   - config: Informer 配置
-//   - resourceStore: 资源存储层（依赖注入）
-//   - logger: 日志记录器
+// NewInformer creates a new Informer.
+// Parameters:
+//   - dynamicClient: Kubernetes dynamic client
+//   - config: Informer configuration
+//   - resourceStore: Resource storage layer (dependency injection)
+//   - logger: Logger instance
 func NewInformer(
 	dynamicClient dynamic.Interface,
 	config *InformerConfig,
 	resourceStore *store.ResourceStore,
 	logger *log.Entry,
 ) (*Informer, error) {
-	// 参数验证
+	// Validate parameters
 	if config == nil {
 		return nil, errors.New("config cannot be nil")
 	}
@@ -87,7 +87,7 @@ func NewInformer(
 	}, nil
 }
 
-// Start 启动 Informer 并开始监听资源
+// Start starts the Informer and begins watching resources.
 func (i *Informer) Start(ctx context.Context) error {
 	if i.started {
 		return errors.New("informer already started")
@@ -108,7 +108,7 @@ func (i *Informer) Start(ctx context.Context) error {
 	i.informerStopCh = make(chan struct{})
 	go i.informer.Run(i.informerStopCh)
 
-	// 等待缓存同步
+	// Wait for cache sync
 	i.logger.Info("Waiting for informer cache to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
 		close(i.informerStopCh)
@@ -119,13 +119,13 @@ func (i *Informer) Start(ctx context.Context) error {
 	i.started = true
 	i.logger.Info("Dynamic informer started and cache synced successfully")
 
-	// 输出初始统计信息
+	// Log initial statistics
 	i.logInitialStats()
 
 	return nil
 }
 
-// Stop 停止 Informer
+// Stop stops the Informer.
 func (i *Informer) Stop() error {
 	if !i.started {
 		i.logger.Warn("Informer not started, nothing to stop")
@@ -145,7 +145,7 @@ func (i *Informer) Stop() error {
 	return nil
 }
 
-// HasSynced 返回 Informer 缓存是否已同步
+// HasSynced returns whether the Informer cache is synced.
 func (i *Informer) HasSynced() bool {
 	if i.informer == nil {
 		return false
@@ -153,13 +153,13 @@ func (i *Informer) HasSynced() bool {
 	return i.informer.HasSynced()
 }
 
-// IsStarted 返回 Informer 是否已启动
+// IsStarted returns whether the Informer has been started.
 func (i *Informer) IsStarted() bool {
 	return i.started
 }
 
-// GetStore 返回 Informer 内部的 cache.Store（用于调试）
-// 注意：不建议直接使用，应该通过 ResourceStore 访问数据
+// GetStore returns the internal cache.Store (for debugging).
+// Note: Direct use is not recommended; data should be accessed through ResourceStore.
 func (i *Informer) GetStore() cache.Store {
 	if i.informer == nil {
 		return nil
@@ -167,12 +167,12 @@ func (i *Informer) GetStore() cache.Store {
 	return i.informer.GetStore()
 }
 
-// GetConfig 返回 Informer 配置
+// GetConfig returns the Informer configuration.
 func (i *Informer) GetConfig() *InformerConfig {
 	return i.config
 }
 
-// registerEventHandlers 注册事件处理器
+// registerEventHandlers registers event handlers.
 func (i *Informer) registerEventHandlers() error {
 	_, err := i.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -204,7 +204,7 @@ func (i *Informer) registerEventHandlers() error {
 	return nil
 }
 
-// handleAdd 处理资源添加事件
+// handleAdd handles resource add events.
 func (i *Informer) handleAdd(obj *unstructured.Unstructured) {
 	i.logger.WithFields(log.Fields{
 		"namespace": obj.GetNamespace(),
@@ -212,13 +212,13 @@ func (i *Informer) handleAdd(obj *unstructured.Unstructured) {
 		"uid":       obj.GetUID(),
 	}).Debug("Resource added")
 
-	// 直接写入 ResourceStore
+	// Write directly to ResourceStore
 	i.store.Add(obj)
 }
 
-// handleUpdate 处理资源更新事件
+// handleUpdate handles resource update events.
 func (i *Informer) handleUpdate(oldObj, newObj *unstructured.Unstructured) {
-	// 检查 ResourceVersion 是否变化（避免无效更新）
+	// Check if ResourceVersion changed (avoid invalid updates)
 	if oldObj.GetResourceVersion() == newObj.GetResourceVersion() {
 		i.logger.WithFields(log.Fields{
 			"namespace": newObj.GetNamespace(),
@@ -235,11 +235,11 @@ func (i *Informer) handleUpdate(oldObj, newObj *unstructured.Unstructured) {
 		"new_version": newObj.GetResourceVersion(),
 	}).Debug("Resource updated")
 
-	// 直接写入 ResourceStore
+	// Write directly to ResourceStore
 	i.store.Update(newObj)
 }
 
-// handleDelete 处理资源删除事件
+// handleDelete handles resource delete events.
 func (i *Informer) handleDelete(obj *unstructured.Unstructured) {
 	i.logger.WithFields(log.Fields{
 		"namespace": obj.GetNamespace(),
@@ -247,19 +247,19 @@ func (i *Informer) handleDelete(obj *unstructured.Unstructured) {
 		"uid":       obj.GetUID(),
 	}).Debug("Resource deleted")
 
-	// 从 ResourceStore 删除
+	// Delete from ResourceStore
 	i.store.Delete(obj)
 }
 
-// extractUnstructured 从事件对象中提取 Unstructured
-// 处理 DeletedFinalStateUnknown 的特殊情况
+// extractUnstructured extracts Unstructured from event object.
+// Handles the special case of DeletedFinalStateUnknown.
 func (i *Informer) extractUnstructured(obj any) *unstructured.Unstructured {
-	// 直接类型断言
+	// Direct type assertion
 	if u, ok := obj.(*unstructured.Unstructured); ok {
 		return u
 	}
 
-	// 处理 DeletedFinalStateUnknown（删除事件的特殊情况）
+	// Handle DeletedFinalStateUnknown (special case for delete events)
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		if u, ok := tombstone.Obj.(*unstructured.Unstructured); ok {
 			i.logger.WithFields(log.Fields{
@@ -274,13 +274,13 @@ func (i *Informer) extractUnstructured(obj any) *unstructured.Unstructured {
 		return nil
 	}
 
-	// 无法识别的类型
+	// Unrecognized type
 	i.logger.WithField("object_type", fmt.Sprintf("%T", obj)).
 		Error("Failed to extract Unstructured from object")
 	return nil
 }
 
-// logInitialStats 输出初始统计信息
+// logInitialStats logs initial statistics.
 func (i *Informer) logInitialStats() {
 	storeLen := i.store.Len()
 	cacheLen := 0
@@ -294,12 +294,12 @@ func (i *Informer) logInitialStats() {
 	}).Info("Initial sync completed")
 }
 
-// GetResourceCount 获取当前监听的资源数量
+// GetResourceCount returns the number of currently watched resources.
 func (i *Informer) GetResourceCount() int {
 	return i.store.Len()
 }
 
-// LogStats 输出当前统计信息（用于调试和监控）
+// LogStats logs current statistics (for debugging and monitoring).
 func (i *Informer) LogStats() {
 	if !i.started {
 		i.logger.Warn("Informer not started")
@@ -317,7 +317,7 @@ func (i *Informer) LogStats() {
 	}).Info("Informer statistics")
 }
 
-// WaitForSync 等待 Informer 缓存同步（带超时）
+// WaitForSync waits for Informer cache sync (with timeout).
 func (i *Informer) WaitForSync(timeout time.Duration) error {
 	if !i.started {
 		return errors.New("informer not started")

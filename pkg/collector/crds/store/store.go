@@ -10,53 +10,53 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// ResourceStore 资源存储层
-// 职责：管理所有 CRD 资源的内存缓存，提供线程安全的 CRUD 操作
+// ResourceStore is the resource storage layer.
+// Responsibilities: Manages in-memory cache of all CRD resources, providing thread-safe CRUD operations.
 type ResourceStore struct {
-	// 资源存储：key 格式为 "namespace/name" 或 "name"（cluster-scoped）
+	// Resource storage: key format is "namespace/name" or "name" (for cluster-scoped)
 	mu        sync.RWMutex
 	resources map[string]*unstructured.Unstructured
 
-	// 日志
+	// Logger instance
 	logger *log.Entry
 
-	// 配置
+	// Configuration
 	config *StoreConfig
 
-	// 统计信息
+	// Statistics
 	metrics StoreMetrics
 }
 
-// StoreConfig 存储配置
+// StoreConfig configures the store.
 type StoreConfig struct {
-	// 是否启用深拷贝（防止外部修改）
-	// 建议启用，虽然有性能开销，但保证数据安全
+	// Whether to enable deep copy (prevents external modifications)
+	// Recommended to enable, though it has performance overhead, it ensures data safety
 	EnableDeepCopy bool
 
-	// 资源类型标识（用于日志和调试）
-	// 例如："metering.sealos.io/v1/Account"
+	// Resource type identifier (for logging and debugging)
+	// Example: "metering.sealos.io/v1/Account"
 	ResourceType string
 
-	// 最大缓存数量（0 表示无限制）
-	// 超过此数量时会记录警告日志
+	// Maximum cache size (0 means unlimited)
+	// Warning log will be recorded when exceeded
 	MaxSize int
 }
 
-// StoreMetrics 存储层统计信息
+// StoreMetrics tracks storage layer statistics.
 type StoreMetrics struct {
-	AddCount    atomic.Int64 // 添加操作计数
-	UpdateCount atomic.Int64 // 更新操作计数
-	DeleteCount atomic.Int64 // 删除操作计数
-	TotalCount  atomic.Int64 // 当前总数
+	AddCount    atomic.Int64 // Add operation count
+	UpdateCount atomic.Int64 // Update operation count
+	DeleteCount atomic.Int64 // Delete operation count
+	TotalCount  atomic.Int64 // Current total count
 }
 
-// NewResourceStore 创建新的资源存储
+// NewResourceStore creates a new resource storage.
 func NewResourceStore(logger *log.Entry, config *StoreConfig) *ResourceStore {
 	if config == nil {
 		config = &StoreConfig{
-			EnableDeepCopy: true, // 默认启用深拷贝
+			EnableDeepCopy: true, // Deep copy enabled by default
 			ResourceType:   "unknown",
-			MaxSize:        0, // 无限制
+			MaxSize:        0, // Unlimited
 		}
 	}
 
@@ -78,8 +78,8 @@ func NewResourceStore(logger *log.Entry, config *StoreConfig) *ResourceStore {
 	return store
 }
 
-// Add 添加资源到存储
-// 如果资源已存在，会被覆盖（等同于 Update）
+// Add adds a resource to the store.
+// If the resource already exists, it will be overwritten (equivalent to Update).
 func (s *ResourceStore) Add(obj *unstructured.Unstructured) {
 	if obj == nil {
 		s.logger.Warn("Attempted to add nil object")
@@ -91,17 +91,17 @@ func (s *ResourceStore) Add(obj *unstructured.Unstructured) {
 
 	key := s.getKey(obj)
 
-	// 检查是否已存在
+	// Check if already exists
 	_, exists := s.resources[key]
 
-	// 存储对象（可选深拷贝）
+	// Store object (optional deep copy)
 	if s.config.EnableDeepCopy {
 		s.resources[key] = obj.DeepCopy()
 	} else {
 		s.resources[key] = obj
 	}
 
-	// 更新统计
+	// Update statistics
 	if exists {
 		s.metrics.UpdateCount.Add(1)
 		s.logger.WithField("key", key).Debug("Resource updated (via Add)")
@@ -111,12 +111,12 @@ func (s *ResourceStore) Add(obj *unstructured.Unstructured) {
 		s.logger.WithField("key", key).Debug("Resource added")
 	}
 
-	// 检查大小限制
+	// Check size limit
 	s.checkSizeLimit()
 }
 
-// Update 更新存储中的资源
-// 如果资源不存在，会被添加（等同于 Add）
+// Update updates a resource in the store.
+// If the resource doesn't exist, it will be added (equivalent to Add).
 func (s *ResourceStore) Update(obj *unstructured.Unstructured) {
 	if obj == nil {
 		s.logger.Warn("Attempted to update nil object")
@@ -128,17 +128,17 @@ func (s *ResourceStore) Update(obj *unstructured.Unstructured) {
 
 	key := s.getKey(obj)
 
-	// 检查是否已存在
+	// Check if already exists
 	_, exists := s.resources[key]
 
-	// 存储对象（可选深拷贝）
+	// Store object (optional deep copy)
 	if s.config.EnableDeepCopy {
 		s.resources[key] = obj.DeepCopy()
 	} else {
 		s.resources[key] = obj
 	}
 
-	// 更新统计
+	// Update statistics
 	if exists {
 		s.metrics.UpdateCount.Add(1)
 		s.logger.WithField("key", key).Debug("Resource updated")
@@ -148,11 +148,11 @@ func (s *ResourceStore) Update(obj *unstructured.Unstructured) {
 		s.logger.WithField("key", key).Debug("Resource added (via Update)")
 	}
 
-	// 检查大小限制
+	// Check size limit
 	s.checkSizeLimit()
 }
 
-// Delete 从存储中删除资源
+// Delete removes a resource from the store.
 func (s *ResourceStore) Delete(obj *unstructured.Unstructured) {
 	if obj == nil {
 		s.logger.Warn("Attempted to delete nil object")
@@ -164,7 +164,7 @@ func (s *ResourceStore) Delete(obj *unstructured.Unstructured) {
 
 	key := s.getKey(obj)
 
-	// 检查是否存在
+	// Check if exists
 	if _, exists := s.resources[key]; exists {
 		delete(s.resources, key)
 		s.metrics.DeleteCount.Add(1)
@@ -175,8 +175,8 @@ func (s *ResourceStore) Delete(obj *unstructured.Unstructured) {
 	}
 }
 
-// Get 根据 namespace 和 name 获取资源
-// 返回资源对象和是否存在的标志
+// Get retrieves a resource by namespace and name.
+// Returns the resource object and a flag indicating whether it exists.
 func (s *ResourceStore) Get(namespace, name string) (*unstructured.Unstructured, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -188,7 +188,7 @@ func (s *ResourceStore) Get(namespace, name string) (*unstructured.Unstructured,
 		return nil, false
 	}
 
-	// 返回深拷贝，防止外部修改
+	// Return deep copy to prevent external modifications
 	if s.config.EnableDeepCopy {
 		return obj.DeepCopy(), true
 	}
@@ -196,8 +196,8 @@ func (s *ResourceStore) Get(namespace, name string) (*unstructured.Unstructured,
 	return obj, true
 }
 
-// List 返回所有资源的列表
-// 返回的是资源的副本（如果启用了深拷贝）
+// List returns a list of all resources.
+// Returns copies of resources (if deep copy is enabled).
 func (s *ResourceStore) List() []*unstructured.Unstructured {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -215,8 +215,8 @@ func (s *ResourceStore) List() []*unstructured.Unstructured {
 	return result
 }
 
-// ListByNamespace 返回指定 namespace 下的所有资源
-// 如果 namespace 为空字符串，返回所有 cluster-scoped 资源
+// ListByNamespace returns all resources in the specified namespace.
+// If namespace is an empty string, returns all cluster-scoped resources.
 func (s *ResourceStore) ListByNamespace(namespace string) []*unstructured.Unstructured {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -236,15 +236,15 @@ func (s *ResourceStore) ListByNamespace(namespace string) []*unstructured.Unstru
 	return result
 }
 
-// Len 返回当前存储的资源数量
+// Len returns the number of currently stored resources.
 func (s *ResourceStore) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.resources)
 }
 
-// Clear 清空所有资源
-// 注意：此操作不可逆，谨慎使用
+// Clear removes all resources.
+// Note: This operation is irreversible, use with caution.
 func (s *ResourceStore) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -256,7 +256,7 @@ func (s *ResourceStore) Clear() {
 	s.logger.WithField("cleared_count", count).Info("Resource store cleared")
 }
 
-// GetMetrics 获取存储统计信息的快照
+// GetMetrics returns a snapshot of storage statistics.
 func (s *ResourceStore) GetMetrics() StoreMetricsSnapshot {
 	return StoreMetricsSnapshot{
 		AddCount:    s.metrics.AddCount.Load(),
@@ -266,7 +266,7 @@ func (s *ResourceStore) GetMetrics() StoreMetricsSnapshot {
 	}
 }
 
-// StoreMetricsSnapshot 统计信息快照（用于返回）
+// StoreMetricsSnapshot is a snapshot of statistics (for return).
 type StoreMetricsSnapshot struct {
 	AddCount    int64
 	UpdateCount int64
@@ -274,19 +274,19 @@ type StoreMetricsSnapshot struct {
 	TotalCount  int64
 }
 
-// GetResourceType 获取资源类型标识
+// GetResourceType returns the resource type identifier.
 func (s *ResourceStore) GetResourceType() string {
 	return s.config.ResourceType
 }
 
-// IsEmpty 检查存储是否为空
+// IsEmpty checks if the store is empty.
 func (s *ResourceStore) IsEmpty() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.resources) == 0
 }
 
-// Contains 检查指定资源是否存在
+// Contains checks if the specified resource exists.
 func (s *ResourceStore) Contains(namespace, name string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -296,29 +296,29 @@ func (s *ResourceStore) Contains(namespace, name string) bool {
 	return exists
 }
 
-// getKey 从 Unstructured 对象生成存储键
-// 内部方法，调用前必须已持有锁
+// getKey generates a storage key from an Unstructured object.
+// Internal method, must be called while holding the lock.
 func (s *ResourceStore) getKey(obj *unstructured.Unstructured) string {
 	namespace := obj.GetNamespace()
 	name := obj.GetName()
 	return s.makeKey(namespace, name)
 }
 
-// makeKey 根据 namespace 和 name 生成存储键
-// 格式：
+// makeKey generates a storage key from namespace and name.
+// Format:
 //   - namespace-scoped: "namespace/name"
 //   - cluster-scoped: "name"
 func (s *ResourceStore) makeKey(namespace, name string) string {
 	if namespace == "" {
-		// Cluster-scoped 资源
+		// Cluster-scoped resource
 		return name
 	}
-	// Namespace-scoped 资源
+	// Namespace-scoped resource
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
-// checkSizeLimit 检查存储大小是否超过限制
-// 内部方法，调用前必须已持有锁
+// checkSizeLimit checks if storage size exceeds the limit.
+// Internal method, must be called while holding the lock.
 func (s *ResourceStore) checkSizeLimit() {
 	if s.config.MaxSize > 0 && len(s.resources) > s.config.MaxSize {
 		s.logger.WithFields(log.Fields{
@@ -328,7 +328,7 @@ func (s *ResourceStore) checkSizeLimit() {
 	}
 }
 
-// LogStats 输出当前存储统计信息（用于调试）
+// LogStats logs current storage statistics (for debugging).
 func (s *ResourceStore) LogStats() {
 	metrics := s.GetMetrics()
 	s.logger.WithFields(log.Fields{
@@ -339,7 +339,7 @@ func (s *ResourceStore) LogStats() {
 	}).Info("Resource store statistics")
 }
 
-// GetKeys 返回所有存储的键（用于调试）
+// GetKeys returns all stored keys (for debugging).
 func (s *ResourceStore) GetKeys() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
