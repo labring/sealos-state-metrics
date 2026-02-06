@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// FailureReason represents the classified reason for image pull failure
 type FailureReason string
 
 const (
