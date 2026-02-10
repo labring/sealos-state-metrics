@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"regexp"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -23,6 +25,39 @@ func decodeSecret(data map[string][]byte, key string) (string, error) {
 
 	// The data is already decoded by Kubernetes client
 	return string(encoded), nil
+}
+
+// sanitizeIdentifier sanitizes a SQL identifier to prevent SQL injection
+// It only allows alphanumeric characters, underscores, and hyphens
+// This is used for database names, table names, etc.
+func sanitizeIdentifier(identifier string) (string, error) {
+	// Only allow alphanumeric, underscore, and hyphen
+	re := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !re.MatchString(identifier) {
+		return "", fmt.Errorf("invalid identifier: contains illegal characters")
+	}
+
+	// MySQL identifier length limit is 64 characters
+	if len(identifier) > 64 {
+		return "", fmt.Errorf("identifier too long: max 64 characters")
+	}
+
+	return identifier, nil
+}
+
+// quoteIdentifier quotes a SQL identifier for safe use in queries
+// This is a defense-in-depth measure even after sanitization
+func quoteIdentifier(identifier string, dbType string) string {
+	switch dbType {
+	case "mysql":
+		// MySQL uses backticks
+		return "`" + identifier + "`"
+	case "postgres":
+		// PostgreSQL uses double quotes
+		return `"` + identifier + `"`
+	default:
+		return identifier
+	}
 }
 
 // checkMySQLConnectivity checks MySQL database connectivity
@@ -67,44 +102,56 @@ func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbNam
 	// Run validation commands
 	testDBName := fmt.Sprintf("test_db_%d", time.Now().Unix())
 
+	// Sanitize the test database name to prevent SQL injection
+	sanitizedDBName, err := sanitizeIdentifier(testDBName)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize database name: %w", err)
+	}
+
+	// Quote identifier for additional safety
+	quotedDBName := quoteIdentifier(sanitizedDBName, "mysql")
+
 	// SHOW DATABASES
 	if _, err := db.ExecContext(ctx, "SHOW DATABASES"); err != nil {
 		return fmt.Errorf("failed to show databases: %w", err)
 	}
 
-	// CREATE DATABASE
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", testDBName)); err != nil {
+	// CREATE DATABASE - Using safe identifier quoting
+	createDBQuery := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", quotedDBName)
+	if _, err := db.ExecContext(ctx, createDBQuery); err != nil {
 		return fmt.Errorf("failed to create test database: %w", err)
 	}
 
-	// USE DATABASE
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("USE %s", testDBName)); err != nil {
+	// USE DATABASE - Using safe identifier quoting
+	useDBQuery := fmt.Sprintf("USE %s", quotedDBName)
+	if _, err := db.ExecContext(ctx, useDBQuery); err != nil {
 		return fmt.Errorf("failed to use test database: %w", err)
 	}
 
-	// CREATE TABLE
+	// CREATE TABLE - Safe query without user input
 	if _, err := db.ExecContext(ctx, "CREATE TABLE test_table (id INT)"); err != nil {
 		return fmt.Errorf("failed to create test table: %w", err)
 	}
 
-	// INSERT
+	// INSERT - Safe query with no user input
 	if _, err := db.ExecContext(ctx, "INSERT INTO test_table VALUES (1)"); err != nil {
 		return fmt.Errorf("failed to insert test data: %w", err)
 	}
 
-	// SELECT
+	// SELECT - Safe query
 	var id int
 	if err := db.QueryRowContext(ctx, "SELECT * FROM test_table").Scan(&id); err != nil {
 		return fmt.Errorf("failed to select test data: %w", err)
 	}
 
-	// DROP TABLE
+	// DROP TABLE - Safe query without user input
 	if _, err := db.ExecContext(ctx, "DROP TABLE test_table"); err != nil {
 		return fmt.Errorf("failed to drop test table: %w", err)
 	}
 
-	// DROP DATABASE
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP DATABASE %s", testDBName)); err != nil {
+	// DROP DATABASE - Using safe identifier quoting
+	dropDBQuery := fmt.Sprintf("DROP DATABASE %s", quotedDBName)
+	if _, err := db.ExecContext(ctx, dropDBQuery); err != nil {
 		return fmt.Errorf("failed to drop test database: %w", err)
 	}
 
@@ -134,10 +181,14 @@ func (c *Collector) checkPostgreSQLConnectivity(ctx context.Context, namespace, 
 		return fmt.Errorf("failed to get port: %w", err)
 	}
 
-	// Build connection string
+	// Build connection string with proper URL encoding to prevent injection
 	// Format: postgresql://username:password@host:port/postgres?sslmode=disable
-	dsn := fmt.Sprintf("postgresql://%s:%s@%s.%s.svc:%s/postgres?sslmode=disable&connect_timeout=%d",
-		username, password, host, namespace, port, int(c.config.CheckTimeout.Seconds()))
+	// Use url.UserPassword for safe encoding of credentials
+	userInfo := url.UserPassword(username, password)
+
+	// Construct the DSN safely
+	dsn := fmt.Sprintf("postgresql://%s@%s.%s.svc:%s/postgres?sslmode=disable&connect_timeout=%d",
+		userInfo.String(), host, namespace, port, int(c.config.CheckTimeout.Seconds()))
 
 	// Connect to PostgreSQL
 	db, err := sql.Open("postgres", dsn)
@@ -162,23 +213,23 @@ func (c *Collector) checkPostgreSQLConnectivity(ctx context.Context, namespace, 
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
 
-	// CREATE TABLE
+	// CREATE TABLE - Safe query without user input
 	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS test_table (id SERIAL)"); err != nil {
 		return fmt.Errorf("failed to create test table: %w", err)
 	}
 
-	// INSERT
+	// INSERT - Safe query
 	if _, err := db.ExecContext(ctx, "INSERT INTO test_table DEFAULT VALUES"); err != nil {
 		return fmt.Errorf("failed to insert test data: %w", err)
 	}
 
-	// SELECT
+	// SELECT - Safe query
 	var id int
 	if err := db.QueryRowContext(ctx, "SELECT * FROM test_table LIMIT 1").Scan(&id); err != nil {
 		return fmt.Errorf("failed to select test data: %w", err)
 	}
 
-	// DROP TABLE
+	// DROP TABLE - Safe query without user input
 	if _, err := db.ExecContext(ctx, "DROP TABLE test_table"); err != nil {
 		return fmt.Errorf("failed to drop test table: %w", err)
 	}
@@ -203,9 +254,11 @@ func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbN
 	// Format: dbName-mongodb.namespace.svc:27017
 	host := fmt.Sprintf("%s-mongodb.%s.svc:27017", dbName, namespace)
 
-	// Build connection string
-	// Format: mongodb://username:password@host:port
-	uri := fmt.Sprintf("mongodb://%s:%s@%s", username, password, host)
+	// Build connection string with proper URL encoding
+	// MongoDB URI format: mongodb://username:password@host:port
+	// Use url.UserPassword for safe credential encoding
+	userInfo := url.UserPassword(username, password)
+	uri := fmt.Sprintf("mongodb://%s@%s", userInfo.String(), host)
 
 	// Set client options
 	clientOptions := options.Client().
@@ -231,6 +284,7 @@ func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbN
 	}
 
 	// Run validation commands
+	// Use a safe database name (no user input in the name)
 	testDB := client.Database("test_db")
 
 	// Show databases (list database names)
@@ -238,13 +292,13 @@ func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbN
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
 
-	// Insert one document
+	// Insert one document - MongoDB driver handles BSON encoding safely
 	collection := testDB.Collection("test_collection")
 	if _, err := collection.InsertOne(ctx, map[string]interface{}{"test": 1}); err != nil {
 		return fmt.Errorf("failed to insert test document: %w", err)
 	}
 
-	// Find one document
+	// Find one document - Safe query using BSON
 	var result map[string]interface{}
 	if err := collection.FindOne(ctx, map[string]interface{}{"test": 1}).Decode(&result); err != nil {
 		return fmt.Errorf("failed to find test document: %w", err)
@@ -271,6 +325,7 @@ func (c *Collector) checkRedisConnectivity(ctx context.Context, namespace, dbNam
 	addr := fmt.Sprintf("%s-redis-redis.%s.svc:6379", dbName, namespace)
 
 	// Create Redis client
+	// Redis client handles password encoding safely
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         addr,
 		Password:     password,
@@ -287,14 +342,15 @@ func (c *Collector) checkRedisConnectivity(ctx context.Context, namespace, dbNam
 	}
 
 	// Run validation commands
+	// Use timestamp to create unique key (no special characters)
 	testKey := fmt.Sprintf("test_key_%d", time.Now().Unix())
 
-	// SET
+	// SET - Redis client handles key/value encoding safely
 	if err := rdb.Set(ctx, testKey, "hello", 0).Err(); err != nil {
 		return fmt.Errorf("failed to set test key: %w", err)
 	}
 
-	// GET
+	// GET - Safe operation
 	val, err := rdb.Get(ctx, testKey).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get test key: %w", err)
@@ -303,7 +359,7 @@ func (c *Collector) checkRedisConnectivity(ctx context.Context, namespace, dbNam
 		return fmt.Errorf("unexpected value for test key: got %s, want hello", val)
 	}
 
-	// DEL
+	// DEL - Safe operation
 	if err := rdb.Del(ctx, testKey).Err(); err != nil {
 		return fmt.Errorf("failed to delete test key: %w", err)
 	}
