@@ -333,6 +333,110 @@ func TestURLEncodingSafety(t *testing.T) {
 	}
 }
 
+// TestBuildSafeDDL tests the safe DDL building function
+func TestBuildSafeDDL(t *testing.T) {
+	tests := []struct {
+		name       string
+		template   string
+		identifier string
+		dbType     string
+		wantSQL    string
+		wantErr    bool
+	}{
+		{
+			name:       "valid mysql create database",
+			template:   "CREATE DATABASE IF NOT EXISTS %s",
+			identifier: "test_db_123",
+			dbType:     "mysql",
+			wantSQL:    "CREATE DATABASE IF NOT EXISTS `test_db_123`",
+			wantErr:    false,
+		},
+		{
+			name:       "valid mysql use database",
+			template:   "USE %s",
+			identifier: "test_db",
+			dbType:     "mysql",
+			wantSQL:    "USE `test_db`",
+			wantErr:    false,
+		},
+		{
+			name:       "valid mysql drop database",
+			template:   "DROP DATABASE %s",
+			identifier: "old_db",
+			dbType:     "mysql",
+			wantSQL:    "DROP DATABASE `old_db`",
+			wantErr:    false,
+		},
+		{
+			name:       "valid postgres create database",
+			template:   "CREATE DATABASE %s",
+			identifier: "test_db",
+			dbType:     "postgres",
+			wantSQL:    "CREATE DATABASE \"test_db\"",
+			wantErr:    false,
+		},
+		{
+			name:       "invalid identifier with semicolon",
+			template:   "CREATE DATABASE %s",
+			identifier: "test; DROP TABLE users; --",
+			dbType:     "mysql",
+			wantSQL:    "",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid identifier with quote",
+			template:   "USE %s",
+			identifier: "test' OR '1'='1",
+			dbType:     "mysql",
+			wantSQL:    "",
+			wantErr:    true,
+		},
+		{
+			name:       "invalid identifier too long",
+			template:   "CREATE DATABASE %s",
+			identifier: "a123456789b123456789c123456789d123456789e123456789f123456789g12345",
+			dbType:     "mysql",
+			wantSQL:    "",
+			wantErr:    true,
+		},
+		{
+			name:       "valid identifier with hyphen",
+			template:   "CREATE DATABASE %s",
+			identifier: "test-db-name",
+			dbType:     "mysql",
+			wantSQL:    "CREATE DATABASE `test-db-name`",
+			wantErr:    false,
+		},
+		{
+			name:       "valid identifier with underscore",
+			template:   "DROP DATABASE %s",
+			identifier: "test_db_name",
+			dbType:     "postgres",
+			wantSQL:    "DROP DATABASE \"test_db_name\"",
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSQL, err := buildSafeDDL(tt.template, tt.identifier, tt.dbType)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("buildSafeDDL() expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("buildSafeDDL() unexpected error: %v", err)
+				}
+				if gotSQL != tt.wantSQL {
+					t.Errorf("buildSafeDDL() = %q, want %q", gotSQL, tt.wantSQL)
+				}
+			}
+		})
+	}
+}
+
 // Benchmark tests
 func BenchmarkSanitizeIdentifier(b *testing.B) {
 	identifier := "test_db_123"
@@ -347,5 +451,14 @@ func BenchmarkQuoteIdentifier(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = quoteIdentifier(identifier, "mysql")
+	}
+}
+
+func BenchmarkBuildSafeDDL(b *testing.B) {
+	template := "CREATE DATABASE IF NOT EXISTS %s"
+	identifier := "test_db_123"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = buildSafeDDL(template, identifier, "mysql")
 	}
 }
