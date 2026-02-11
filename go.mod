@@ -21,7 +21,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/billing v1.3.39
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.47
-	github.com/volcengine/volcengine-go-sdk v1.2.9
+	github.com/volcengine/volcengine-go-sdk v1.2.12
 	go.mongodb.org/mongo-driver v1.17.9
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.0
