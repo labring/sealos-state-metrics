@@ -3,7 +3,7 @@ module github.com/labring/sealos-state-metrics
 go 1.25.0
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/alibabacloud-go/bssopenapi-20171214 v1.0.8
 	github.com/alibabacloud-go/darabonba-openapi v0.2.1
 	github.com/alibabacloud-go/tea v1.4.0
