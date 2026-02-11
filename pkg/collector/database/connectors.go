@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -34,12 +35,12 @@ func sanitizeIdentifier(identifier string) (string, error) {
 	// Only allow alphanumeric, underscore, and hyphen
 	re := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !re.MatchString(identifier) {
-		return "", fmt.Errorf("invalid identifier: contains illegal characters")
+		return "", errors.New("invalid identifier: contains illegal characters")
 	}
 
 	// MySQL identifier length limit is 64 characters
 	if len(identifier) > 64 {
-		return "", fmt.Errorf("identifier too long: max 64 characters")
+		return "", errors.New("identifier too long: max 64 characters")
 	}
 
 	return identifier, nil
@@ -47,7 +48,7 @@ func sanitizeIdentifier(identifier string) (string, error) {
 
 // quoteIdentifier quotes a SQL identifier for safe use in queries
 // This is a defense-in-depth measure even after sanitization
-func quoteIdentifier(identifier string, dbType string) string {
+func quoteIdentifier(identifier, dbType string) string {
 	switch dbType {
 	case "mysql":
 		// MySQL uses backticks
@@ -63,7 +64,7 @@ func quoteIdentifier(identifier string, dbType string) string {
 // buildSafeDDL constructs a DDL statement with a sanitized and quoted identifier
 // This function provides an additional layer of safety and makes the security measures explicit
 // Returns the SQL statement and any error from sanitization
-func buildSafeDDL(template string, identifier string, dbType string) (string, error) {
+func buildSafeDDL(template, identifier, dbType string) (string, error) {
 	// Sanitize first
 	sanitized, err := sanitizeIdentifier(identifier)
 	if err != nil {
@@ -81,7 +82,10 @@ func buildSafeDDL(template string, identifier string, dbType string) (string, er
 }
 
 // checkMySQLConnectivity checks MySQL database connectivity
-func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbName string, secret *corev1.Secret) error {
+func (c *Collector) checkMySQLConnectivity(
+	ctx context.Context,
+	secret *corev1.Secret,
+) error {
 	// Extract connection information from secret
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
@@ -133,6 +137,7 @@ func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbNam
 	if err != nil {
 		return fmt.Errorf("failed to build CREATE DATABASE query: %w", err)
 	}
+
 	if _, err := db.ExecContext(ctx, createDBQuery); err != nil {
 		return fmt.Errorf("failed to create test database: %w", err)
 	}
@@ -143,6 +148,7 @@ func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbNam
 	if err != nil {
 		return fmt.Errorf("failed to build USE query: %w", err)
 	}
+
 	if _, err := db.ExecContext(ctx, useDBQuery); err != nil {
 		return fmt.Errorf("failed to use test database: %w", err)
 	}
@@ -174,6 +180,7 @@ func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbNam
 	if err != nil {
 		return fmt.Errorf("failed to build DROP DATABASE query: %w", err)
 	}
+
 	if _, err := db.ExecContext(ctx, dropDBQuery); err != nil {
 		return fmt.Errorf("failed to drop test database: %w", err)
 	}
@@ -182,7 +189,11 @@ func (c *Collector) checkMySQLConnectivity(ctx context.Context, namespace, dbNam
 }
 
 // checkPostgreSQLConnectivity checks PostgreSQL database connectivity
-func (c *Collector) checkPostgreSQLConnectivity(ctx context.Context, namespace, dbName string, secret *corev1.Secret) error {
+func (c *Collector) checkPostgreSQLConnectivity(
+	ctx context.Context,
+	namespace string,
+	secret *corev1.Secret,
+) error {
 	// Extract connection information from secret
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
@@ -237,7 +248,10 @@ func (c *Collector) checkPostgreSQLConnectivity(ctx context.Context, namespace, 
 	}
 
 	// CREATE TABLE - Safe query without user input
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS test_table (id SERIAL)"); err != nil {
+	if _, err := db.ExecContext(
+		ctx,
+		"CREATE TABLE IF NOT EXISTS test_table (id SERIAL)",
+	); err != nil {
 		return fmt.Errorf("failed to create test table: %w", err)
 	}
 
@@ -261,7 +275,11 @@ func (c *Collector) checkPostgreSQLConnectivity(ctx context.Context, namespace, 
 }
 
 // checkMongoDBConnectivity checks MongoDB database connectivity
-func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbName string, secret *corev1.Secret) error {
+func (c *Collector) checkMongoDBConnectivity(
+	ctx context.Context,
+	namespace, dbName string,
+	secret *corev1.Secret,
+) error {
 	// Extract connection information from secret
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
@@ -311,19 +329,19 @@ func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbN
 	testDB := client.Database("test_db")
 
 	// Show databases (list database names)
-	if _, err := client.ListDatabaseNames(ctx, map[string]interface{}{}); err != nil {
+	if _, err := client.ListDatabaseNames(ctx, map[string]any{}); err != nil {
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
 
 	// Insert one document - MongoDB driver handles BSON encoding safely
 	collection := testDB.Collection("test_collection")
-	if _, err := collection.InsertOne(ctx, map[string]interface{}{"test": 1}); err != nil {
+	if _, err := collection.InsertOne(ctx, map[string]any{"test": 1}); err != nil {
 		return fmt.Errorf("failed to insert test document: %w", err)
 	}
 
 	// Find one document - Safe query using BSON
-	var result map[string]interface{}
-	if err := collection.FindOne(ctx, map[string]interface{}{"test": 1}).Decode(&result); err != nil {
+	var result map[string]any
+	if err := collection.FindOne(ctx, map[string]any{"test": 1}).Decode(&result); err != nil {
 		return fmt.Errorf("failed to find test document: %w", err)
 	}
 
@@ -336,7 +354,11 @@ func (c *Collector) checkMongoDBConnectivity(ctx context.Context, namespace, dbN
 }
 
 // checkRedisConnectivity checks Redis database connectivity
-func (c *Collector) checkRedisConnectivity(ctx context.Context, namespace, dbName string, secret *corev1.Secret) error {
+func (c *Collector) checkRedisConnectivity(
+	ctx context.Context,
+	namespace, dbName string,
+	secret *corev1.Secret,
+) error {
 	// Extract connection information from secret
 	password, err := decodeSecret(secret.Data, "password")
 	if err != nil {
@@ -378,6 +400,7 @@ func (c *Collector) checkRedisConnectivity(ctx context.Context, namespace, dbNam
 	if err != nil {
 		return fmt.Errorf("failed to get test key: %w", err)
 	}
+
 	if val != "hello" {
 		return fmt.Errorf("unexpected value for test key: got %s, want hello", val)
 	}

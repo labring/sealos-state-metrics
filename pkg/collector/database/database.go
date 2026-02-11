@@ -125,22 +125,30 @@ func (c *Collector) Poll(ctx context.Context) error {
 
 		// Check MySQL databases
 		if err := c.scanDatabases(ctx, ns, DatabaseTypeMySQL, newStatus); err != nil {
-			c.logger.WithError(err).WithField("namespace", ns).Error("Failed to scan MySQL databases")
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan MySQL databases")
 		}
 
 		// Check PostgreSQL databases
 		if err := c.scanDatabases(ctx, ns, DatabaseTypePostgreSQL, newStatus); err != nil {
-			c.logger.WithError(err).WithField("namespace", ns).Error("Failed to scan PostgreSQL databases")
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan PostgreSQL databases")
 		}
 
 		// Check MongoDB databases
 		if err := c.scanDatabases(ctx, ns, DatabaseTypeMongoDB, newStatus); err != nil {
-			c.logger.WithError(err).WithField("namespace", ns).Error("Failed to scan MongoDB databases")
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan MongoDB databases")
 		}
 
 		// Check Redis databases
 		if err := c.scanDatabases(ctx, ns, DatabaseTypeRedis, newStatus); err != nil {
-			c.logger.WithError(err).WithField("namespace", ns).Error("Failed to scan Redis databases")
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan Redis databases")
 		}
 	}
 
@@ -150,6 +158,7 @@ func (c *Collector) Poll(ctx context.Context) error {
 	c.mu.Unlock()
 
 	c.logger.WithField("databases", len(newStatus)).Info("Database connectivity check completed")
+
 	return nil
 }
 
@@ -175,17 +184,26 @@ func (c *Collector) getNamespaces(ctx context.Context) ([]string, error) {
 }
 
 // scanDatabases scans for databases of a specific type in a namespace
-func (c *Collector) scanDatabases(ctx context.Context, namespace string, dbType DatabaseType, statusMap map[string]*DatabaseStatus) error {
+func (c *Collector) scanDatabases(
+	ctx context.Context,
+	namespace string,
+	dbType DatabaseType,
+	statusMap map[string]*DatabaseStatus,
+) error {
 	var secretSelector string
 
 	switch dbType {
 	case DatabaseTypeMySQL:
+		// #nosec G101
 		secretSelector = "app.kubernetes.io/name=apecloud-mysql"
 	case DatabaseTypePostgreSQL:
+		// #nosec G101
 		secretSelector = "app.kubernetes.io/name=postgresql"
 	case DatabaseTypeMongoDB:
+		// #nosec G101
 		secretSelector = "apps.kubeblocks.io/component-name=mongodb"
 	case DatabaseTypeRedis:
+		// #nosec G101
 		secretSelector = "apps.kubeblocks.io/component-name=redis"
 	default:
 		return nil
@@ -234,14 +252,18 @@ func (c *Collector) isCredentialSecret(secret *corev1.Secret, dbType DatabaseTyp
 	switch dbType {
 	case DatabaseTypeMySQL, DatabaseTypePostgreSQL:
 		suffix := "-conn-credential"
-		return len(secret.Name) > len(suffix) && secret.Name[len(secret.Name)-len(suffix):] == suffix
+		return len(secret.Name) > len(suffix) &&
+			secret.Name[len(secret.Name)-len(suffix):] == suffix
 	case DatabaseTypeMongoDB:
 		suffix := "-mongodb-account-root"
-		return len(secret.Name) > len(suffix) && secret.Name[len(secret.Name)-len(suffix):] == suffix
+		return len(secret.Name) > len(suffix) &&
+			secret.Name[len(secret.Name)-len(suffix):] == suffix
 	case DatabaseTypeRedis:
 		suffix := "-redis-account-default"
-		return len(secret.Name) > len(suffix) && secret.Name[len(secret.Name)-len(suffix):] == suffix
+		return len(secret.Name) > len(suffix) &&
+			secret.Name[len(secret.Name)-len(suffix):] == suffix
 	}
+
 	return false
 }
 
@@ -264,11 +286,17 @@ func (c *Collector) extractDatabaseName(secret *corev1.Secret, dbType DatabaseTy
 			return secret.Name[:len(secret.Name)-len("-redis-account-default")]
 		}
 	}
+
 	return secret.Name
 }
 
 // checkDatabaseConnectivity checks if a database is accessible
-func (c *Collector) checkDatabaseConnectivity(ctx context.Context, namespace, dbName string, dbType DatabaseType, secret *corev1.Secret) *DatabaseStatus {
+func (c *Collector) checkDatabaseConnectivity(
+	ctx context.Context,
+	namespace, dbName string,
+	dbType DatabaseType,
+	secret *corev1.Secret,
+) *DatabaseStatus {
 	status := &DatabaseStatus{
 		Name:         dbName,
 		Namespace:    namespace,
@@ -286,9 +314,9 @@ func (c *Collector) checkDatabaseConnectivity(ctx context.Context, namespace, db
 	var err error
 	switch dbType {
 	case DatabaseTypeMySQL:
-		err = c.checkMySQLConnectivity(checkCtx, namespace, dbName, secret)
+		err = c.checkMySQLConnectivity(checkCtx, secret)
 	case DatabaseTypePostgreSQL:
-		err = c.checkPostgreSQLConnectivity(checkCtx, namespace, dbName, secret)
+		err = c.checkPostgreSQLConnectivity(checkCtx, namespace, secret)
 	case DatabaseTypeMongoDB:
 		err = c.checkMongoDBConnectivity(checkCtx, namespace, dbName, secret)
 	case DatabaseTypeRedis:

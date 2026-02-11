@@ -1,3 +1,4 @@
+//nolint:testpackage
 package database
 
 import (
@@ -118,12 +119,17 @@ func TestSanitizeIdentifier(t *testing.T) {
 				if err == nil {
 					t.Errorf("sanitizeIdentifier() expected error but got none")
 				} else if tt.expectError != "" && err.Error() != tt.expectError {
-					t.Errorf("sanitizeIdentifier() error = %v, want %v", err.Error(), tt.expectError)
+					t.Errorf(
+						"sanitizeIdentifier() error = %v, want %v",
+						err.Error(),
+						tt.expectError,
+					)
 				}
 			} else {
 				if err != nil {
 					t.Errorf("sanitizeIdentifier() unexpected error: %v", err)
 				}
+
 				if result != tt.identifier {
 					t.Errorf("sanitizeIdentifier() = %v, want %v", result, tt.identifier)
 				}
@@ -236,6 +242,7 @@ func TestDecodeSecret(t *testing.T) {
 				t.Errorf("decodeSecret() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("decodeSecret() = %v, want %v", got, tt.want)
 			}
@@ -280,7 +287,10 @@ func TestSQLInjectionPrevention(t *testing.T) {
 		t.Run("block_"+attempt, func(t *testing.T) {
 			_, err := sanitizeIdentifier(attempt)
 			if err == nil {
-				t.Errorf("sanitizeIdentifier() should have rejected SQL injection attempt: %q", attempt)
+				t.Errorf(
+					"sanitizeIdentifier() should have rejected SQL injection attempt: %q",
+					attempt,
+				)
 			}
 		})
 	}
@@ -290,7 +300,6 @@ func TestSQLInjectionPrevention(t *testing.T) {
 func TestURLEncodingSafety(t *testing.T) {
 	// This test documents the expected behavior of url.UserPassword
 	// It's not a direct test of our code, but ensures we understand the library behavior
-
 	tests := []struct {
 		name     string
 		username string
@@ -429,6 +438,7 @@ func TestBuildSafeDDL(t *testing.T) {
 				if err != nil {
 					t.Errorf("buildSafeDDL() unexpected error: %v", err)
 				}
+
 				if gotSQL != tt.wantSQL {
 					t.Errorf("buildSafeDDL() = %q, want %q", gotSQL, tt.wantSQL)
 				}
@@ -440,16 +450,16 @@ func TestBuildSafeDDL(t *testing.T) {
 // Benchmark tests
 func BenchmarkSanitizeIdentifier(b *testing.B) {
 	identifier := "test_db_123"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		_, _ = sanitizeIdentifier(identifier)
 	}
 }
 
 func BenchmarkQuoteIdentifier(b *testing.B) {
 	identifier := "test_db_123"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		_ = quoteIdentifier(identifier, "mysql")
 	}
 }
@@ -457,8 +467,8 @@ func BenchmarkQuoteIdentifier(b *testing.B) {
 func BenchmarkBuildSafeDDL(b *testing.B) {
 	template := "CREATE DATABASE IF NOT EXISTS %s"
 	identifier := "test_db_123"
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		_, _ = buildSafeDDL(template, identifier, "mysql")
 	}
 }
