@@ -130,26 +130,26 @@ func (c *Collector) Poll(ctx context.Context) error {
 				Error("Failed to scan MySQL databases")
 		}
 
-		// // Check PostgreSQL databases
-		// if err := c.scanDatabases(ctx, ns, DatabaseTypePostgreSQL, newStatus); err != nil {
-		// 	c.logger.WithError(err).
-		// 		WithField("namespace", ns).
-		// 		Error("Failed to scan PostgreSQL databases")
-		// }
-		//
-		// // Check MongoDB databases
-		// if err := c.scanDatabases(ctx, ns, DatabaseTypeMongoDB, newStatus); err != nil {
-		// 	c.logger.WithError(err).
-		// 		WithField("namespace", ns).
-		// 		Error("Failed to scan MongoDB databases")
-		// }
-		//
-		// // Check Redis databases
-		// if err := c.scanDatabases(ctx, ns, DatabaseTypeRedis, newStatus); err != nil {
-		// 	c.logger.WithError(err).
-		// 		WithField("namespace", ns).
-		// 		Error("Failed to scan Redis databases")
-		// }
+		// Check PostgreSQL databases
+		if err := c.scanDatabases(ctx, ns, DatabaseTypePostgreSQL, newStatus); err != nil {
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan PostgreSQL databases")
+		}
+
+		// Check MongoDB databases
+		if err := c.scanDatabases(ctx, ns, DatabaseTypeMongoDB, newStatus); err != nil {
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan MongoDB databases")
+		}
+
+		// Check Redis databases
+		if err := c.scanDatabases(ctx, ns, DatabaseTypeRedis, newStatus); err != nil {
+			c.logger.WithError(err).
+				WithField("namespace", ns).
+				Error("Failed to scan Redis databases")
+		}
 	}
 
 	// Update internal state
@@ -195,7 +195,6 @@ func (c *Collector) scanDatabases(
 	switch dbType {
 	case DatabaseTypeMySQL:
 		// #nosec G101
-		// secretSelector = "app.kubernetes.io/name=apecloud-mysql"
 		secretSelector = "apps.kubeblocks.io/cluster-type=mysql"
 	case DatabaseTypePostgreSQL:
 		// #nosec G101
