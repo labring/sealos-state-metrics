@@ -130,26 +130,26 @@ func (c *Collector) Poll(ctx context.Context) error {
 				Error("Failed to scan MySQL databases")
 		}
 
-		// Check PostgreSQL databases
-		if err := c.scanDatabases(ctx, ns, DatabaseTypePostgreSQL, newStatus); err != nil {
-			c.logger.WithError(err).
-				WithField("namespace", ns).
-				Error("Failed to scan PostgreSQL databases")
-		}
-
-		// Check MongoDB databases
-		if err := c.scanDatabases(ctx, ns, DatabaseTypeMongoDB, newStatus); err != nil {
-			c.logger.WithError(err).
-				WithField("namespace", ns).
-				Error("Failed to scan MongoDB databases")
-		}
-
-		// Check Redis databases
-		if err := c.scanDatabases(ctx, ns, DatabaseTypeRedis, newStatus); err != nil {
-			c.logger.WithError(err).
-				WithField("namespace", ns).
-				Error("Failed to scan Redis databases")
-		}
+		// // Check PostgreSQL databases
+		// if err := c.scanDatabases(ctx, ns, DatabaseTypePostgreSQL, newStatus); err != nil {
+		// 	c.logger.WithError(err).
+		// 		WithField("namespace", ns).
+		// 		Error("Failed to scan PostgreSQL databases")
+		// }
+		//
+		// // Check MongoDB databases
+		// if err := c.scanDatabases(ctx, ns, DatabaseTypeMongoDB, newStatus); err != nil {
+		// 	c.logger.WithError(err).
+		// 		WithField("namespace", ns).
+		// 		Error("Failed to scan MongoDB databases")
+		// }
+		//
+		// // Check Redis databases
+		// if err := c.scanDatabases(ctx, ns, DatabaseTypeRedis, newStatus); err != nil {
+		// 	c.logger.WithError(err).
+		// 		WithField("namespace", ns).
+		// 		Error("Failed to scan Redis databases")
+		// }
 	}
 
 	// Update internal state
@@ -214,8 +214,11 @@ func (c *Collector) scanDatabases(
 		LabelSelector: secretSelector,
 	})
 	if err != nil {
+		c.logger.WithError(err).Errorf("获取 %s 数据库 Secret 失败", dbType)
 		return err
 	}
+
+	c.logger.Infof("在命名空间 %s 中找到 %d 个 %s 数据库 Secret", namespace, len(secrets.Items), dbType)
 
 	for _, secret := range secrets.Items {
 		select {
@@ -233,14 +236,17 @@ func (c *Collector) scanDatabases(
 		dbName := c.extractDatabaseName(&secret, dbType)
 		key := namespace + "/" + dbName
 
-		c.logger.WithFields(log.Fields{
-			"namespace": namespace,
-			"database":  dbName,
-			"type":      dbType,
-		}).Debug("Checking database connectivity")
+		c.logger.Infof("正在检查数据库连接: %s/%s (%s)", namespace, dbName, dbType)
 
 		// Check connectivity
 		status := c.checkDatabaseConnectivity(ctx, namespace, dbName, dbType, &secret)
+
+		if status.Connected {
+			c.logger.Infof("数据库连接成功: %s/%s", namespace, dbName)
+		} else {
+			c.logger.Warnf("数据库连接失败: %s/%s, 原因: %s", namespace, dbName, status.Error)
+		}
+
 		statusMap[key] = status
 	}
 
