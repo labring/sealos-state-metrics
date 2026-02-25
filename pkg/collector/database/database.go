@@ -195,7 +195,8 @@ func (c *Collector) scanDatabases(
 	switch dbType {
 	case DatabaseTypeMySQL:
 		// #nosec G101
-		secretSelector = "app.kubernetes.io/name=apecloud-mysql"
+		// secretSelector = "app.kubernetes.io/name=apecloud-mysql"
+		secretSelector = "apps.kubeblocks.io/cluster-type=mysql"
 	case DatabaseTypePostgreSQL:
 		// #nosec G101
 		secretSelector = "app.kubernetes.io/name=postgresql"
