@@ -59,14 +59,14 @@ func (c *Collector) checkMySQLConnectivity(
 	// 6. Reconnect to test database
 	dbWithTestDB, err := c.reconnectToDatabase(connInfo, testDBName)
 	if err != nil {
-		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
+		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName)
 		return fmt.Errorf("failed to reconnect to test database: %w", err)
 	}
 	defer dbWithTestDB.Close()
 
 	// 7. Test table-level permissions
 	if err := c.testMySQLTablePermissions(ctx, dbWithTestDB); err != nil {
-		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
+		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName)
 		return err
 	}
 

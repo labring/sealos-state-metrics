@@ -57,14 +57,14 @@ func (c *Collector) checkPostgreSQLConnectivity(
 	// 6. Reconnect to test database
 	dbWithTestDB, err := c.reconnectToPostgreSQLDatabase(connInfo, testDBName)
 	if err != nil {
-		_ = c.cleanupPostgreSQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
+		_ = c.cleanupPostgreSQLTestDatabase(ctx, db, testDBName)
 		return fmt.Errorf("failed to reconnect to test database: %w", err)
 	}
 	defer dbWithTestDB.Close()
 
 	// 7. Test table-level permissions
 	if err := c.testPostgreSQLTablePermissions(ctx, dbWithTestDB); err != nil {
-		_ = c.cleanupPostgreSQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
+		_ = c.cleanupPostgreSQLTestDatabase(ctx, db, testDBName)
 		return err
 	}
 

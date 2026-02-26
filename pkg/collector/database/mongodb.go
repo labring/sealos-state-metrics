@@ -61,7 +61,7 @@ func (c *Collector) checkMongoDBConnectivity(
 
 	// 6. Test collection-level permissions
 	if err := c.testMongoDBCollectionPermissions(ctx, client, testDBName); err != nil {
-		_ = c.cleanupMongoDBTestDatabase(ctx, client, testDBName) //nolint:errcheck // Cleanup error is non-critical
+		_ = c.cleanupMongoDBTestDatabase(ctx, client, testDBName)
 		return err
 	}
 
@@ -153,7 +153,7 @@ func (c *Collector) testMongoDBBasicConnection(
 func (c *Collector) testMongoDBDatabasePermissions(
 	ctx context.Context,
 	client *mongo.Client,
-	_ string, //nolint:unparam // testDBName parameter reserved for future use
+	_ string,
 ) error {
 	// Test LIST DATABASES
 	if _, err := client.ListDatabaseNames(ctx, bson.M{}); err != nil {
