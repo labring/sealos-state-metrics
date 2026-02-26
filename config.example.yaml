@@ -70,7 +70,7 @@ performance:
   informerResyncPeriod: "10m"
 
 # List of enabled collectors
-# Available collectors: domain, node, pod, imagepull, zombie, cloudbalance
+# Available collectors: domain, node, pod, imagepull, zombie, cloudbalance, database
 enabledCollectors:
   - domain
   - node
@@ -78,6 +78,7 @@ enabledCollectors:
   - imagepull
   - zombie
   # - cloudbalance  # Disabled by default
+  # - database      # Disabled by default
 
 # Instance identity (optional, defaults to POD_NAME env var, IP, hostname, or random ID)
 # identity: "custom-instance-id"
@@ -181,6 +182,20 @@ collectors:
         accessKeySecret: "your-secret-here"
         regionId: "cn-beijing"
 
+  # Database collector - monitors database connectivity
+  # Automatically discovers databases from KubeBlocks clusters in the cluster
+  # Supports: MySQL, PostgreSQL, MongoDB, Redis
+  database:
+    # Check interval for database connectivity tests
+    checkInterval: "5m"
+    # Timeout for each database connection attempt
+    checkTimeout: "10s"
+    # List of namespaces to scan for databases (empty = all namespaces)
+    namespaces: []
+      # - ns-kkeniczm
+      # - default
+      # - production
+
 # ============================================================================
 # Environment Variable Overrides
 # ============================================================================
@@ -196,6 +211,9 @@ collectors:
 #   COLLECTORS_DOMAIN_DOMAINS=example.com,test.com
 #   COLLECTORS_POD_RESTART_THRESHOLD=10
 #   COLLECTORS_ZOMBIE_CHECK_INTERVAL=1m
+#   COLLECTORS_DATABASE_CHECK_INTERVAL=5m
+#   COLLECTORS_DATABASE_CHECK_TIMEOUT=10s
+#   COLLECTORS_DATABASE_NAMESPACES=ns-user1,ns-user2
 #
 # For arrays, use comma-separated values:
 #   COLLECTORS_DOMAIN_DOMAINS=domain1.com,domain2.com,domain3.com

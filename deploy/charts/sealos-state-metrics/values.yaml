@@ -115,7 +115,7 @@ leaderElection:
   retryPeriod: "2s"
 
 # Enabled collectors
-# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm]
+# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm, database, crd]
 enabledCollectors:
   - lvm
 
@@ -145,6 +145,15 @@ collectors:
 
   lvm:
     updateInterval: "10s"
+
+  database:
+    checkTimeout: "10s"
+    checkInterval: "5m"
+    namespaces: []  # Empty means all namespaces
+
+  crd:
+    updateInterval: "30s"
+    namespaces: []  # Empty means all namespaces
 
 # Pod configuration
 podAnnotations: {}

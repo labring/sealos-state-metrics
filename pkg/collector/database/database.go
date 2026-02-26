@@ -55,14 +55,14 @@ func (c *Collector) initMetrics(namespace string) {
 	c.connectivityGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "database", "connectivity"),
 		"Database connectivity status (1 = connected, 0 = disconnected)",
-		[]string{"namespace", "database", "type"},
+		[]string{"namespace", "database", "type"}, // namespace is K8s namespace label
 		nil,
 	)
 
 	c.responseTimeGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "database", "response_time_seconds"),
 		"Database connection response time in seconds",
-		[]string{"namespace", "database", "type"},
+		[]string{"namespace", "database", "type"}, // namespace is K8s namespace label
 		nil,
 	)
 
@@ -195,7 +195,7 @@ func (c *Collector) scanDatabases(
 	switch dbType {
 	case DatabaseTypeMySQL:
 		// #nosec G101
-		secretSelector = "app.kubernetes.io/name=apecloud-mysql"
+		secretSelector = "apps.kubeblocks.io/cluster-type=mysql"
 	case DatabaseTypePostgreSQL:
 		// #nosec G101
 		secretSelector = "app.kubernetes.io/name=postgresql"
@@ -214,8 +214,16 @@ func (c *Collector) scanDatabases(
 		LabelSelector: secretSelector,
 	})
 	if err != nil {
+		c.logger.WithError(err).Errorf("Failed to get %s database secrets", dbType)
 		return err
 	}
+
+	c.logger.Debugf(
+		"Found %d %s database secrets in namespace %s",
+		len(secrets.Items),
+		dbType,
+		namespace,
+	)
 
 	for _, secret := range secrets.Items {
 		select {
@@ -233,14 +241,23 @@ func (c *Collector) scanDatabases(
 		dbName := c.extractDatabaseName(&secret, dbType)
 		key := namespace + "/" + dbName
 
-		c.logger.WithFields(log.Fields{
-			"namespace": namespace,
-			"database":  dbName,
-			"type":      dbType,
-		}).Debug("Checking database connectivity")
+		c.logger.Debugf("Checking database connection: %s/%s (%s)", namespace, dbName, dbType)
 
 		// Check connectivity
 		status := c.checkDatabaseConnectivity(ctx, namespace, dbName, dbType, &secret)
+
+		if status.Connected {
+			c.logger.Infof("Database %s/%s (%s) is healthy", namespace, dbName, dbType)
+		} else {
+			c.logger.Warnf(
+				"Database %s/%s (%s) is unhealthy: %s",
+				namespace,
+				dbName,
+				dbType,
+				status.Error,
+			)
+		}
+
 		statusMap[key] = status
 	}
 
