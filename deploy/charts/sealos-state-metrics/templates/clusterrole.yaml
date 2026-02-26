@@ -30,15 +30,23 @@ rules:
       - pods
     verbs: ["get", "list"]
 
-{{- if has "kubeblocks" .Values.enabledCollectors }}
+{{- if has "crds" .Values.enabledCollectors }}
   # KubeBlocks resources (for kubeblocks collector)
   - apiGroups: ["apps.kubeblocks.io"]
     resources:
       - clusters
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["dataprotection.kubeblocks.io"]
+    resources:
+      - backups
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["devbox.sealos.io"]
+    resources:
+      - devboxes
+    verbs: ["get", "list", "watch"]
 {{- end }}
 
-{{- if has "crd" .Values.enabledCollectors }}
+{{- if has "crds" .Values.enabledCollectors }}
   # CRD resources (for crd collector)
   - apiGroups: ["apiextensions.k8s.io"]
     resources:
