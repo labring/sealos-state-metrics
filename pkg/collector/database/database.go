@@ -218,7 +218,7 @@ func (c *Collector) scanDatabases(
 		return err
 	}
 
-	c.logger.Infof("Found %d %s database secrets in namespace %s", len(secrets.Items), dbType, namespace)
+	c.logger.Debugf("Found %d %s database secrets in namespace %s", len(secrets.Items), dbType, namespace)
 
 	for _, secret := range secrets.Items {
 		select {
@@ -236,15 +236,15 @@ func (c *Collector) scanDatabases(
 		dbName := c.extractDatabaseName(&secret, dbType)
 		key := namespace + "/" + dbName
 
-		c.logger.Infof("Checking database connection: %s/%s (%s)", namespace, dbName, dbType)
+		c.logger.Debugf("Checking database connection: %s/%s (%s)", namespace, dbName, dbType)
 
 		// Check connectivity
 		status := c.checkDatabaseConnectivity(ctx, namespace, dbName, dbType, &secret)
 
 		if status.Connected {
-			c.logger.Infof("Database connection successful: %s/%s", namespace, dbName)
+			c.logger.Infof("Database %s/%s (%s) is healthy", namespace, dbName, dbType)
 		} else {
-			c.logger.Warnf("Database connection failed: %s/%s, reason: %s", namespace, dbName, status.Error)
+			c.logger.Warnf("Database %s/%s (%s) is unhealthy: %s", namespace, dbName, dbType, status.Error)
 		}
 
 		statusMap[key] = status

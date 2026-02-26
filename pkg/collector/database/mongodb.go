@@ -33,7 +33,7 @@ func (c *Collector) checkMongoDBConnectivity(
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
 
-	c.logger.Infof("Connecting to MongoDB: %s (namespace: %s)", connInfo.Endpoint, namespace)
+	c.logger.Debugf("Connecting to MongoDB: %s (namespace: %s)", connInfo.Endpoint, namespace)
 
 	// 2. Establish connection
 	client, err := c.openMongoDBConnection(ctx, connInfo.URI)
@@ -133,30 +133,22 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 
 // testMongoDBBasicConnection tests basic MongoDB connection
 func (c *Collector) testMongoDBBasicConnection(ctx context.Context, client *mongo.Client, endpoint string) error {
-	c.logger.Debug("Executing Ping test")
 	if err := client.Ping(ctx, nil); err != nil {
 		c.logger.WithError(err).Errorf("MongoDB Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
-
-	c.logger.Infof("✓ MongoDB connection successful: %s", endpoint)
 	return nil
 }
 
 // testMongoDBDatabasePermissions tests database-level permissions
 func (c *Collector) testMongoDBDatabasePermissions(ctx context.Context, client *mongo.Client, testDBName string) error {
 	// Test LIST DATABASES
-	c.logger.Debug("Testing LIST DATABASES permission")
 	if _, err := client.ListDatabaseNames(ctx, bson.M{}); err != nil {
 		c.logger.WithError(err).Error("LIST DATABASES execution failed")
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
-	c.logger.Info("✓ LIST DATABASES permission OK")
 
 	// Note: MongoDB creates databases implicitly when you insert data
-	// So we'll test database creation as part of collection operations
-	c.logger.Debugf("Database will be created implicitly: %s", testDBName)
-
 	return nil
 }
 
@@ -198,19 +190,16 @@ func (c *Collector) testMongoDBCollectionPermissions(ctx context.Context, client
 
 // testMongoDBInsert tests INSERT permission
 func (c *Collector) testMongoDBInsert(ctx context.Context, collection *mongo.Collection) error {
-	c.logger.Debug("Testing INSERT permission")
 	document := bson.M{"id": 1, "name": "test"}
 	if _, err := collection.InsertOne(ctx, document); err != nil {
 		c.logger.WithError(err).Error("INSERT failed")
 		return fmt.Errorf("failed to insert document: %w", err)
 	}
-	c.logger.Info("✓ INSERT permission OK")
 	return nil
 }
 
 // testMongoDBSelect tests SELECT (Find) permission
 func (c *Collector) testMongoDBSelect(ctx context.Context, collection *mongo.Collection) error {
-	c.logger.Debug("Testing SELECT permission")
 	var result bson.M
 	filter := bson.M{"id": 1}
 	if err := collection.FindOne(ctx, filter).Decode(&result); err != nil {
@@ -223,43 +212,36 @@ func (c *Collector) testMongoDBSelect(ctx context.Context, collection *mongo.Col
 		c.logger.Errorf("SELECT result incorrect: %v", result)
 		return fmt.Errorf("unexpected select result: %v", result)
 	}
-	c.logger.Info("✓ SELECT permission OK")
 	return nil
 }
 
 // testMongoDBUpdate tests UPDATE permission
 func (c *Collector) testMongoDBUpdate(ctx context.Context, collection *mongo.Collection) error {
-	c.logger.Debug("Testing UPDATE permission")
 	filter := bson.M{"id": 1}
 	update := bson.M{"$set": bson.M{"name": "updated"}}
 	if _, err := collection.UpdateOne(ctx, filter, update); err != nil {
 		c.logger.WithError(err).Error("UPDATE failed")
 		return fmt.Errorf("failed to update document: %w", err)
 	}
-	c.logger.Info("✓ UPDATE permission OK")
 	return nil
 }
 
 // testMongoDBDelete tests DELETE permission
 func (c *Collector) testMongoDBDelete(ctx context.Context, collection *mongo.Collection) error {
-	c.logger.Debug("Testing DELETE permission")
 	filter := bson.M{"id": 1}
 	if _, err := collection.DeleteOne(ctx, filter); err != nil {
 		c.logger.WithError(err).Error("DELETE failed")
 		return fmt.Errorf("failed to delete document: %w", err)
 	}
-	c.logger.Info("✓ DELETE permission OK")
 	return nil
 }
 
 // testMongoDBDropCollection tests DROP COLLECTION permission
 func (c *Collector) testMongoDBDropCollection(ctx context.Context, collection *mongo.Collection) error {
-	c.logger.Debug("Testing DROP COLLECTION permission")
 	if err := collection.Drop(ctx); err != nil {
 		c.logger.WithError(err).Error("DROP COLLECTION failed")
 		return fmt.Errorf("failed to drop collection: %w", err)
 	}
-	c.logger.Info("✓ DROP COLLECTION permission OK")
 	return nil
 }
 
@@ -272,6 +254,6 @@ func (c *Collector) cleanupMongoDBTestDatabase(ctx context.Context, client *mong
 		return fmt.Errorf("failed to drop test database: %w", err)
 	}
 
-	c.logger.Infof("✓ Test database cleaned up: %s", testDBName)
+	c.logger.Debugf("Test database cleaned up: %s", testDBName)
 	return nil
 }

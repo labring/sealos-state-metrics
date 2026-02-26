@@ -34,7 +34,7 @@ func (c *Collector) checkMySQLConnectivity(
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
 
-	c.logger.Infof("Connecting to MySQL: %s (namespace: %s)", connInfo.Endpoint, namespace)
+	c.logger.Debugf("Connecting to MySQL: %s (namespace: %s)", connInfo.Endpoint, namespace)
 
 	// 2. Establish initial connection (without specifying database)
 	db, err := c.openMySQLConnection(connInfo.DSN)
@@ -165,28 +165,22 @@ func (c *Collector) openMySQLConnection(dsn string) (*sql.DB, error) {
 
 // testMySQLBasicConnection tests basic MySQL connection
 func (c *Collector) testMySQLBasicConnection(ctx context.Context, db *sql.DB, endpoint string) error {
-	c.logger.Debug("Executing Ping test")
 	if err := db.PingContext(ctx); err != nil {
 		c.logger.WithError(err).Errorf("MySQL Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MySQL: %w", err)
 	}
-
-	c.logger.Infof("✓ MySQL connection successful: %s", endpoint)
 	return nil
 }
 
 // testMySQLDatabasePermissions tests database-level permissions
 func (c *Collector) testMySQLDatabasePermissions(ctx context.Context, db *sql.DB, testDBName string) error {
 	// Test SHOW DATABASES
-	c.logger.Debug("Testing SHOW DATABASES permission")
 	if _, err := db.ExecContext(ctx, "SHOW DATABASES"); err != nil {
 		c.logger.WithError(err).Error("SHOW DATABASES execution failed")
 		return fmt.Errorf("failed to show databases: %w", err)
 	}
-	c.logger.Info("✓ SHOW DATABASES permission OK")
 
 	// Test CREATE DATABASE
-	c.logger.Debugf("Testing CREATE DATABASE permission: %s", testDBName)
 	createDBQuery, err := buildSafeDDL("CREATE DATABASE IF NOT EXISTS %s", testDBName, "mysql")
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to build CREATE DATABASE statement")
@@ -197,7 +191,6 @@ func (c *Collector) testMySQLDatabasePermissions(ctx context.Context, db *sql.DB
 		c.logger.WithError(err).Errorf("Failed to create test database: %s", testDBName)
 		return fmt.Errorf("failed to create test database: %w", err)
 	}
-	c.logger.Infof("✓ CREATE DATABASE permission OK (created %s)", testDBName)
 
 	return nil
 }
@@ -269,31 +262,26 @@ func (c *Collector) testMySQLTablePermissions(ctx context.Context, db *sql.DB) e
 
 // testMySQLCreateTable tests CREATE TABLE permission
 func (c *Collector) testMySQLCreateTable(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing CREATE TABLE permission")
 	createTableQuery := fmt.Sprintf("CREATE TABLE `%s` (id INT PRIMARY KEY, name VARCHAR(50))", tableName)
 	if _, err := db.ExecContext(ctx, createTableQuery); err != nil {
 		c.logger.WithError(err).Error("CREATE TABLE failed")
 		return fmt.Errorf("failed to create table: %w", err)
 	}
-	c.logger.Info("✓ CREATE TABLE permission OK")
 	return nil
 }
 
 // testMySQLInsert tests INSERT permission
 func (c *Collector) testMySQLInsert(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing INSERT permission")
 	insertQuery := fmt.Sprintf("INSERT INTO `%s` (id, name) VALUES (?, ?)", tableName)
 	if _, err := db.ExecContext(ctx, insertQuery, 1, "test"); err != nil {
 		c.logger.WithError(err).Error("INSERT failed")
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
-	c.logger.Info("✓ INSERT permission OK")
 	return nil
 }
 
 // testMySQLSelect tests SELECT permission
 func (c *Collector) testMySQLSelect(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing SELECT permission")
 	var id int
 	var name string
 	selectQuery := fmt.Sprintf("SELECT id, name FROM `%s` WHERE id = ?", tableName)
@@ -306,43 +294,36 @@ func (c *Collector) testMySQLSelect(ctx context.Context, db *sql.DB, tableName s
 		c.logger.Errorf("SELECT result incorrect: id=%d, name=%s", id, name)
 		return fmt.Errorf("unexpected select result: id=%d, name=%s", id, name)
 	}
-	c.logger.Info("✓ SELECT permission OK")
 	return nil
 }
 
 // testMySQLUpdate tests UPDATE permission
 func (c *Collector) testMySQLUpdate(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing UPDATE permission")
 	updateQuery := fmt.Sprintf("UPDATE `%s` SET name = ? WHERE id = ?", tableName)
 	if _, err := db.ExecContext(ctx, updateQuery, "updated", 1); err != nil {
 		c.logger.WithError(err).Error("UPDATE failed")
 		return fmt.Errorf("failed to update data: %w", err)
 	}
-	c.logger.Info("✓ UPDATE permission OK")
 	return nil
 }
 
 // testMySQLDelete tests DELETE permission
 func (c *Collector) testMySQLDelete(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing DELETE permission")
 	deleteQuery := fmt.Sprintf("DELETE FROM `%s` WHERE id = ?", tableName)
 	if _, err := db.ExecContext(ctx, deleteQuery, 1); err != nil {
 		c.logger.WithError(err).Error("DELETE failed")
 		return fmt.Errorf("failed to delete data: %w", err)
 	}
-	c.logger.Info("✓ DELETE permission OK")
 	return nil
 }
 
 // testMySQLDropTable tests DROP TABLE permission
 func (c *Collector) testMySQLDropTable(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing DROP TABLE permission")
 	dropTableQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tableName)
 	if _, err := db.ExecContext(ctx, dropTableQuery); err != nil {
 		c.logger.WithError(err).Error("DROP TABLE failed")
 		return fmt.Errorf("failed to drop table: %w", err)
 	}
-	c.logger.Info("✓ DROP TABLE permission OK")
 	return nil
 }
 
@@ -361,6 +342,6 @@ func (c *Collector) cleanupMySQLTestDatabase(ctx context.Context, db *sql.DB, te
 		return fmt.Errorf("failed to drop test database: %w", err)
 	}
 
-	c.logger.Infof("✓ Test database cleaned up: %s", testDBName)
+	c.logger.Debugf("Test database cleaned up: %s", testDBName)
 	return nil
 }

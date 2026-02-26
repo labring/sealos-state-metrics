@@ -32,7 +32,7 @@ func (c *Collector) checkPostgreSQLConnectivity(
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
 
-	c.logger.Infof("Connecting to PostgreSQL: %s (namespace: %s)", connInfo.Endpoint, namespace)
+	c.logger.Debugf("Connecting to PostgreSQL: %s (namespace: %s)", connInfo.Endpoint, namespace)
 
 	// 2. Establish initial connection (with default postgres database)
 	db, err := c.openPostgreSQLConnection(connInfo.DSN)
@@ -144,28 +144,22 @@ func (c *Collector) openPostgreSQLConnection(dsn string) (*sql.DB, error) {
 
 // testPostgreSQLBasicConnection tests basic PostgreSQL connection
 func (c *Collector) testPostgreSQLBasicConnection(ctx context.Context, db *sql.DB, endpoint string) error {
-	c.logger.Debug("Executing Ping test")
 	if err := db.PingContext(ctx); err != nil {
 		c.logger.WithError(err).Errorf("PostgreSQL Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping PostgreSQL: %w", err)
 	}
-
-	c.logger.Infof("✓ PostgreSQL connection successful: %s", endpoint)
 	return nil
 }
 
 // testPostgreSQLDatabasePermissions tests database-level permissions
 func (c *Collector) testPostgreSQLDatabasePermissions(ctx context.Context, db *sql.DB, testDBName string) error {
 	// Test LIST DATABASES
-	c.logger.Debug("Testing LIST DATABASES permission")
 	if _, err := db.ExecContext(ctx, "SELECT datname FROM pg_database"); err != nil {
 		c.logger.WithError(err).Error("LIST DATABASES execution failed")
 		return fmt.Errorf("failed to list databases: %w", err)
 	}
-	c.logger.Info("✓ LIST DATABASES permission OK")
 
 	// Test CREATE DATABASE
-	c.logger.Debugf("Testing CREATE DATABASE permission: %s", testDBName)
 	createDBQuery, err := buildSafeDDL("CREATE DATABASE %s", testDBName, "postgres")
 	if err != nil {
 		c.logger.WithError(err).Error("Failed to build CREATE DATABASE statement")
@@ -176,7 +170,6 @@ func (c *Collector) testPostgreSQLDatabasePermissions(ctx context.Context, db *s
 		c.logger.WithError(err).Errorf("Failed to create test database: %s", testDBName)
 		return fmt.Errorf("failed to create test database: %w", err)
 	}
-	c.logger.Infof("✓ CREATE DATABASE permission OK (created %s)", testDBName)
 
 	return nil
 }
@@ -249,31 +242,26 @@ func (c *Collector) testPostgreSQLTablePermissions(ctx context.Context, db *sql.
 
 // testPostgreSQLCreateTable tests CREATE TABLE permission
 func (c *Collector) testPostgreSQLCreateTable(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing CREATE TABLE permission")
 	createTableQuery := fmt.Sprintf("CREATE TABLE \"%s\" (id SERIAL PRIMARY KEY, name VARCHAR(50))", tableName)
 	if _, err := db.ExecContext(ctx, createTableQuery); err != nil {
 		c.logger.WithError(err).Error("CREATE TABLE failed")
 		return fmt.Errorf("failed to create table: %w", err)
 	}
-	c.logger.Info("✓ CREATE TABLE permission OK")
 	return nil
 }
 
 // testPostgreSQLInsert tests INSERT permission
 func (c *Collector) testPostgreSQLInsert(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing INSERT permission")
 	insertQuery := fmt.Sprintf("INSERT INTO \"%s\" (name) VALUES ($1)", tableName)
 	if _, err := db.ExecContext(ctx, insertQuery, "test"); err != nil {
 		c.logger.WithError(err).Error("INSERT failed")
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
-	c.logger.Info("✓ INSERT permission OK")
 	return nil
 }
 
 // testPostgreSQLSelect tests SELECT permission
 func (c *Collector) testPostgreSQLSelect(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing SELECT permission")
 	var id int
 	var name string
 	selectQuery := fmt.Sprintf("SELECT id, name FROM \"%s\" WHERE name = $1", tableName)
@@ -286,43 +274,36 @@ func (c *Collector) testPostgreSQLSelect(ctx context.Context, db *sql.DB, tableN
 		c.logger.Errorf("SELECT result incorrect: id=%d, name=%s", id, name)
 		return fmt.Errorf("unexpected select result: id=%d, name=%s", id, name)
 	}
-	c.logger.Info("✓ SELECT permission OK")
 	return nil
 }
 
 // testPostgreSQLUpdate tests UPDATE permission
 func (c *Collector) testPostgreSQLUpdate(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing UPDATE permission")
 	updateQuery := fmt.Sprintf("UPDATE \"%s\" SET name = $1 WHERE name = $2", tableName)
 	if _, err := db.ExecContext(ctx, updateQuery, "updated", "test"); err != nil {
 		c.logger.WithError(err).Error("UPDATE failed")
 		return fmt.Errorf("failed to update data: %w", err)
 	}
-	c.logger.Info("✓ UPDATE permission OK")
 	return nil
 }
 
 // testPostgreSQLDelete tests DELETE permission
 func (c *Collector) testPostgreSQLDelete(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing DELETE permission")
 	deleteQuery := fmt.Sprintf("DELETE FROM \"%s\" WHERE name = $1", tableName)
 	if _, err := db.ExecContext(ctx, deleteQuery, "updated"); err != nil {
 		c.logger.WithError(err).Error("DELETE failed")
 		return fmt.Errorf("failed to delete data: %w", err)
 	}
-	c.logger.Info("✓ DELETE permission OK")
 	return nil
 }
 
 // testPostgreSQLDropTable tests DROP TABLE permission
 func (c *Collector) testPostgreSQLDropTable(ctx context.Context, db *sql.DB, tableName string) error {
-	c.logger.Debug("Testing DROP TABLE permission")
 	dropTableQuery := fmt.Sprintf("DROP TABLE IF EXISTS \"%s\"", tableName)
 	if _, err := db.ExecContext(ctx, dropTableQuery); err != nil {
 		c.logger.WithError(err).Error("DROP TABLE failed")
 		return fmt.Errorf("failed to drop table: %w", err)
 	}
-	c.logger.Info("✓ DROP TABLE permission OK")
 	return nil
 }
 
@@ -341,6 +322,6 @@ func (c *Collector) cleanupPostgreSQLTestDatabase(ctx context.Context, db *sql.D
 		return fmt.Errorf("failed to drop test database: %w", err)
 	}
 
-	c.logger.Infof("✓ Test database cleaned up: %s", testDBName)
+	c.logger.Debugf("Test database cleaned up: %s", testDBName)
 	return nil
 }

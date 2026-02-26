@@ -30,7 +30,7 @@ func (c *Collector) checkRedisConnectivity(
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
 
-	c.logger.Infof("Connecting to Redis: %s (namespace: %s)", connInfo.Endpoint, namespace)
+	c.logger.Debugf("Connecting to Redis: %s (namespace: %s)", connInfo.Endpoint, namespace)
 
 	// 2. Establish connection
 	client, err := c.openRedisConnection(connInfo)
@@ -104,13 +104,10 @@ func (c *Collector) openRedisConnection(connInfo *RedisConnectionInfo) (*redis.C
 
 // testRedisBasicConnection tests basic Redis connection
 func (c *Collector) testRedisBasicConnection(ctx context.Context, client *redis.Client, endpoint string) error {
-	c.logger.Debug("Executing Ping test")
 	if err := client.Ping(ctx).Err(); err != nil {
 		c.logger.WithError(err).Errorf("Redis Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping Redis: %w", err)
 	}
-
-	c.logger.Infof("✓ Redis connection successful: %s", endpoint)
 	return nil
 }
 
@@ -146,18 +143,15 @@ func (c *Collector) testRedisKeyPermissions(ctx context.Context, client *redis.C
 
 // testRedisSet tests SET permission
 func (c *Collector) testRedisSet(ctx context.Context, client *redis.Client, testKey string) error {
-	c.logger.Debug("Testing SET permission")
 	if err := client.Set(ctx, testKey, "test_value", 0).Err(); err != nil {
 		c.logger.WithError(err).Error("SET failed")
 		return fmt.Errorf("failed to set key: %w", err)
 	}
-	c.logger.Info("✓ SET permission OK")
 	return nil
 }
 
 // testRedisGet tests GET permission
 func (c *Collector) testRedisGet(ctx context.Context, client *redis.Client, testKey string) error {
-	c.logger.Debug("Testing GET permission")
 	val, err := client.Get(ctx, testKey).Result()
 	if err != nil {
 		c.logger.WithError(err).Error("GET failed")
@@ -169,13 +163,11 @@ func (c *Collector) testRedisGet(ctx context.Context, client *redis.Client, test
 		c.logger.Errorf("GET result incorrect: got %s, expected test_value", val)
 		return fmt.Errorf("unexpected get result: got %s, expected test_value", val)
 	}
-	c.logger.Info("✓ GET permission OK")
 	return nil
 }
 
 // testRedisExists tests EXISTS permission
 func (c *Collector) testRedisExists(ctx context.Context, client *redis.Client, testKey string) error {
-	c.logger.Debug("Testing EXISTS permission")
 	exists, err := client.Exists(ctx, testKey).Result()
 	if err != nil {
 		c.logger.WithError(err).Error("EXISTS failed")
@@ -186,29 +178,24 @@ func (c *Collector) testRedisExists(ctx context.Context, client *redis.Client, t
 		c.logger.Errorf("EXISTS result incorrect: got %d, expected 1", exists)
 		return fmt.Errorf("unexpected exists result: got %d, expected 1", exists)
 	}
-	c.logger.Info("✓ EXISTS permission OK")
 	return nil
 }
 
 // testRedisUpdate tests UPDATE (SET with new value) permission
 func (c *Collector) testRedisUpdate(ctx context.Context, client *redis.Client, testKey string) error {
-	c.logger.Debug("Testing UPDATE permission")
 	if err := client.Set(ctx, testKey, "updated_value", 0).Err(); err != nil {
 		c.logger.WithError(err).Error("UPDATE (SET) failed")
 		return fmt.Errorf("failed to update key: %w", err)
 	}
-	c.logger.Info("✓ UPDATE permission OK")
 	return nil
 }
 
 // testRedisDelete tests DEL permission
 func (c *Collector) testRedisDelete(ctx context.Context, client *redis.Client, testKey string) error {
-	c.logger.Debug("Testing DEL permission")
 	if err := client.Del(ctx, testKey).Err(); err != nil {
 		c.logger.WithError(err).Error("DEL failed")
 		return fmt.Errorf("failed to delete key: %w", err)
 	}
-	c.logger.Info("✓ DEL permission OK")
 	return nil
 }
 
@@ -234,6 +221,6 @@ func (c *Collector) cleanupRedisTestKey(ctx context.Context, client *redis.Clien
 		return fmt.Errorf("failed to delete test key: %w", err)
 	}
 
-	c.logger.Infof("✓ Test key cleaned up: %s", testKey)
+	c.logger.Debugf("Test key cleaned up: %s", testKey)
 	return nil
 }
