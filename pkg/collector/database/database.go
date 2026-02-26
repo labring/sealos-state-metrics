@@ -55,14 +55,14 @@ func (c *Collector) initMetrics(namespace string) {
 	c.connectivityGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "database", "connectivity"),
 		"Database connectivity status (1 = connected, 0 = disconnected)",
-		[]string{"namespace", "database", "type"},
+		[]string{"namespace", "database", "type"}, // namespace is K8s namespace label
 		nil,
 	)
 
 	c.responseTimeGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "database", "response_time_seconds"),
 		"Database connection response time in seconds",
-		[]string{"namespace", "database", "type"},
+		[]string{"namespace", "database", "type"}, // namespace is K8s namespace label
 		nil,
 	)
 
