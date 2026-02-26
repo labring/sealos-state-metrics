@@ -61,7 +61,7 @@ func (c *Collector) checkMongoDBConnectivity(
 
 	// 6. Test collection-level permissions
 	if err := c.testMongoDBCollectionPermissions(ctx, client, testDBName); err != nil {
-		c.cleanupMongoDBTestDatabase(ctx, client, testDBName)
+		_ = c.cleanupMongoDBTestDatabase(ctx, client, testDBName) //nolint:errcheck // Cleanup error is non-critical
 		return err
 	}
 
@@ -72,11 +72,15 @@ func (c *Collector) checkMongoDBConnectivity(
 	}
 
 	c.logger.Infof("MongoDB all permission tests passed: %s", connInfo.Endpoint)
+
 	return nil
 }
 
 // parseMongoDBConnectionInfo parses connection information from secret
-func (c *Collector) parseMongoDBConnectionInfo(secret *corev1.Secret, namespace, dbName string) (*MongoDBConnectionInfo, error) {
+func (c *Collector) parseMongoDBConnectionInfo(
+	secret *corev1.Secret,
+	namespace, dbName string,
+) (*MongoDBConnectionInfo, error) {
 	// Extract username
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
@@ -92,7 +96,7 @@ func (c *Collector) parseMongoDBConnectionInfo(secret *corev1.Secret, namespace,
 	}
 
 	// MongoDB default host and port
-	host := fmt.Sprintf("%s-mongodb", dbName)
+	host := dbName + "-mongodb"
 	port := "27017"
 
 	// Build full endpoint with K8s service domain
@@ -132,16 +136,25 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 }
 
 // testMongoDBBasicConnection tests basic MongoDB connection
-func (c *Collector) testMongoDBBasicConnection(ctx context.Context, client *mongo.Client, endpoint string) error {
+func (c *Collector) testMongoDBBasicConnection(
+	ctx context.Context,
+	client *mongo.Client,
+	endpoint string,
+) error {
 	if err := client.Ping(ctx, nil); err != nil {
 		c.logger.WithError(err).Errorf("MongoDB Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
+
 	return nil
 }
 
 // testMongoDBDatabasePermissions tests database-level permissions
-func (c *Collector) testMongoDBDatabasePermissions(ctx context.Context, client *mongo.Client, testDBName string) error {
+func (c *Collector) testMongoDBDatabasePermissions(
+	ctx context.Context,
+	client *mongo.Client,
+	_ string, //nolint:unparam // testDBName parameter reserved for future use
+) error {
 	// Test LIST DATABASES
 	if _, err := client.ListDatabaseNames(ctx, bson.M{}); err != nil {
 		c.logger.WithError(err).Error("LIST DATABASES execution failed")
@@ -153,7 +166,11 @@ func (c *Collector) testMongoDBDatabasePermissions(ctx context.Context, client *
 }
 
 // testMongoDBCollectionPermissions tests collection-level permissions
-func (c *Collector) testMongoDBCollectionPermissions(ctx context.Context, client *mongo.Client, testDBName string) error {
+func (c *Collector) testMongoDBCollectionPermissions(
+	ctx context.Context,
+	client *mongo.Client,
+	testDBName string,
+) error {
 	testCollectionName := "test_collection"
 
 	// Get test database and collection
@@ -195,12 +212,14 @@ func (c *Collector) testMongoDBInsert(ctx context.Context, collection *mongo.Col
 		c.logger.WithError(err).Error("INSERT failed")
 		return fmt.Errorf("failed to insert document: %w", err)
 	}
+
 	return nil
 }
 
 // testMongoDBSelect tests SELECT (Find) permission
 func (c *Collector) testMongoDBSelect(ctx context.Context, collection *mongo.Collection) error {
 	var result bson.M
+
 	filter := bson.M{"id": 1}
 	if err := collection.FindOne(ctx, filter).Decode(&result); err != nil {
 		c.logger.WithError(err).Error("SELECT failed")
@@ -212,17 +231,20 @@ func (c *Collector) testMongoDBSelect(ctx context.Context, collection *mongo.Col
 		c.logger.Errorf("SELECT result incorrect: %v", result)
 		return fmt.Errorf("unexpected select result: %v", result)
 	}
+
 	return nil
 }
 
 // testMongoDBUpdate tests UPDATE permission
 func (c *Collector) testMongoDBUpdate(ctx context.Context, collection *mongo.Collection) error {
 	filter := bson.M{"id": 1}
+
 	update := bson.M{"$set": bson.M{"name": "updated"}}
 	if _, err := collection.UpdateOne(ctx, filter, update); err != nil {
 		c.logger.WithError(err).Error("UPDATE failed")
 		return fmt.Errorf("failed to update document: %w", err)
 	}
+
 	return nil
 }
 
@@ -233,20 +255,29 @@ func (c *Collector) testMongoDBDelete(ctx context.Context, collection *mongo.Col
 		c.logger.WithError(err).Error("DELETE failed")
 		return fmt.Errorf("failed to delete document: %w", err)
 	}
+
 	return nil
 }
 
 // testMongoDBDropCollection tests DROP COLLECTION permission
-func (c *Collector) testMongoDBDropCollection(ctx context.Context, collection *mongo.Collection) error {
+func (c *Collector) testMongoDBDropCollection(
+	ctx context.Context,
+	collection *mongo.Collection,
+) error {
 	if err := collection.Drop(ctx); err != nil {
 		c.logger.WithError(err).Error("DROP COLLECTION failed")
 		return fmt.Errorf("failed to drop collection: %w", err)
 	}
+
 	return nil
 }
 
 // cleanupMongoDBTestDatabase cleans up the test database
-func (c *Collector) cleanupMongoDBTestDatabase(ctx context.Context, client *mongo.Client, testDBName string) error {
+func (c *Collector) cleanupMongoDBTestDatabase(
+	ctx context.Context,
+	client *mongo.Client,
+	testDBName string,
+) error {
 	c.logger.Debugf("Cleaning up test database: %s", testDBName)
 
 	if err := client.Database(testDBName).Drop(ctx); err != nil {
@@ -255,5 +286,6 @@ func (c *Collector) cleanupMongoDBTestDatabase(ctx context.Context, client *mong
 	}
 
 	c.logger.Debugf("Test database cleaned up: %s", testDBName)
+
 	return nil
 }

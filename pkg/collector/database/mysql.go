@@ -59,14 +59,14 @@ func (c *Collector) checkMySQLConnectivity(
 	// 6. Reconnect to test database
 	dbWithTestDB, err := c.reconnectToDatabase(connInfo, testDBName)
 	if err != nil {
-		c.cleanupMySQLTestDatabase(ctx, db, testDBName)
+		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
 		return fmt.Errorf("failed to reconnect to test database: %w", err)
 	}
 	defer dbWithTestDB.Close()
 
 	// 7. Test table-level permissions
 	if err := c.testMySQLTablePermissions(ctx, dbWithTestDB); err != nil {
-		c.cleanupMySQLTestDatabase(ctx, db, testDBName)
+		_ = c.cleanupMySQLTestDatabase(ctx, db, testDBName) //nolint:errcheck // Cleanup error is non-critical
 		return err
 	}
 
@@ -77,6 +77,7 @@ func (c *Collector) checkMySQLConnectivity(
 	}
 
 	c.logger.Infof("MySQL all permission tests passed: %s", connInfo.Endpoint)
+
 	return nil
 }
 
@@ -164,16 +165,25 @@ func (c *Collector) openMySQLConnection(dsn string) (*sql.DB, error) {
 }
 
 // testMySQLBasicConnection tests basic MySQL connection
-func (c *Collector) testMySQLBasicConnection(ctx context.Context, db *sql.DB, endpoint string) error {
+func (c *Collector) testMySQLBasicConnection(
+	ctx context.Context,
+	db *sql.DB,
+	endpoint string,
+) error {
 	if err := db.PingContext(ctx); err != nil {
 		c.logger.WithError(err).Errorf("MySQL Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MySQL: %w", err)
 	}
+
 	return nil
 }
 
 // testMySQLDatabasePermissions tests database-level permissions
-func (c *Collector) testMySQLDatabasePermissions(ctx context.Context, db *sql.DB, testDBName string) error {
+func (c *Collector) testMySQLDatabasePermissions(
+	ctx context.Context,
+	db *sql.DB,
+	testDBName string,
+) error {
 	// Test SHOW DATABASES
 	if _, err := db.ExecContext(ctx, "SHOW DATABASES"); err != nil {
 		c.logger.WithError(err).Error("SHOW DATABASES execution failed")
@@ -196,7 +206,10 @@ func (c *Collector) testMySQLDatabasePermissions(ctx context.Context, db *sql.DB
 }
 
 // reconnectToDatabase reconnects to a specific database
-func (c *Collector) reconnectToDatabase(connInfo *MySQLConnectionInfo, dbName string) (*sql.DB, error) {
+func (c *Collector) reconnectToDatabase(
+	connInfo *MySQLConnectionInfo,
+	dbName string,
+) (*sql.DB, error) {
 	// Build DSN with database name
 	dsnWithDB := fmt.Sprintf("%s:%s@tcp(%s)/%s",
 		connInfo.Username,
@@ -206,6 +219,7 @@ func (c *Collector) reconnectToDatabase(connInfo *MySQLConnectionInfo, dbName st
 	)
 
 	c.logger.Debugf("Reconnecting to database: %s", dbName)
+
 	db, err := c.openMySQLConnection(dsnWithDB)
 	if err != nil {
 		c.logger.WithError(err).Errorf("Failed to reconnect: %s", dbName)
@@ -213,13 +227,17 @@ func (c *Collector) reconnectToDatabase(connInfo *MySQLConnectionInfo, dbName st
 	}
 
 	// Test connection
-	if err := db.Ping(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), c.config.CheckTimeout)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
 		c.logger.WithError(err).Errorf("Test database Ping failed: %s", dbName)
 		db.Close()
 		return nil, fmt.Errorf("failed to ping test database: %w", err)
 	}
 
 	c.logger.Debugf("✓ Connected to test database: %s", dbName)
+
 	return db, nil
 }
 
@@ -262,28 +280,43 @@ func (c *Collector) testMySQLTablePermissions(ctx context.Context, db *sql.DB) e
 
 // testMySQLCreateTable tests CREATE TABLE permission
 func (c *Collector) testMySQLCreateTable(ctx context.Context, db *sql.DB, tableName string) error {
-	createTableQuery := fmt.Sprintf("CREATE TABLE `%s` (id INT PRIMARY KEY, name VARCHAR(50))", tableName)
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
+	createTableQuery := fmt.Sprintf(
+		"CREATE TABLE `%s` (id INT PRIMARY KEY, name VARCHAR(50))",
+		tableName,
+	)
 	if _, err := db.ExecContext(ctx, createTableQuery); err != nil {
 		c.logger.WithError(err).Error("CREATE TABLE failed")
 		return fmt.Errorf("failed to create table: %w", err)
 	}
+
 	return nil
 }
 
 // testMySQLInsert tests INSERT permission
 func (c *Collector) testMySQLInsert(ctx context.Context, db *sql.DB, tableName string) error {
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
+	//nolint:gosec // tableName is a constant, not user input
 	insertQuery := fmt.Sprintf("INSERT INTO `%s` (id, name) VALUES (?, ?)", tableName)
 	if _, err := db.ExecContext(ctx, insertQuery, 1, "test"); err != nil {
 		c.logger.WithError(err).Error("INSERT failed")
 		return fmt.Errorf("failed to insert data: %w", err)
 	}
+
 	return nil
 }
 
 // testMySQLSelect tests SELECT permission
 func (c *Collector) testMySQLSelect(ctx context.Context, db *sql.DB, tableName string) error {
-	var id int
-	var name string
+	var (
+		id   int
+		name string
+	)
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
+	//nolint:gosec // tableName is a constant, not user input
 	selectQuery := fmt.Sprintf("SELECT id, name FROM `%s` WHERE id = ?", tableName)
 	if err := db.QueryRowContext(ctx, selectQuery, 1).Scan(&id, &name); err != nil {
 		c.logger.WithError(err).Error("SELECT failed")
@@ -294,41 +327,57 @@ func (c *Collector) testMySQLSelect(ctx context.Context, db *sql.DB, tableName s
 		c.logger.Errorf("SELECT result incorrect: id=%d, name=%s", id, name)
 		return fmt.Errorf("unexpected select result: id=%d, name=%s", id, name)
 	}
+
 	return nil
 }
 
 // testMySQLUpdate tests UPDATE permission
 func (c *Collector) testMySQLUpdate(ctx context.Context, db *sql.DB, tableName string) error {
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
+	//nolint:gosec // tableName is a constant, not user input
 	updateQuery := fmt.Sprintf("UPDATE `%s` SET name = ? WHERE id = ?", tableName)
 	if _, err := db.ExecContext(ctx, updateQuery, "updated", 1); err != nil {
 		c.logger.WithError(err).Error("UPDATE failed")
 		return fmt.Errorf("failed to update data: %w", err)
 	}
+
 	return nil
 }
 
 // testMySQLDelete tests DELETE permission
 func (c *Collector) testMySQLDelete(ctx context.Context, db *sql.DB, tableName string) error {
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
+	//nolint:gosec // tableName is a constant, not user input
 	deleteQuery := fmt.Sprintf("DELETE FROM `%s` WHERE id = ?", tableName)
 	if _, err := db.ExecContext(ctx, deleteQuery, 1); err != nil {
 		c.logger.WithError(err).Error("DELETE failed")
 		return fmt.Errorf("failed to delete data: %w", err)
 	}
+
 	return nil
 }
 
 // testMySQLDropTable tests DROP TABLE permission
 func (c *Collector) testMySQLDropTable(ctx context.Context, db *sql.DB, tableName string) error {
+	// tableName is a constant "test_table", not user input
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
 	dropTableQuery := fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tableName)
 	if _, err := db.ExecContext(ctx, dropTableQuery); err != nil {
 		c.logger.WithError(err).Error("DROP TABLE failed")
 		return fmt.Errorf("failed to drop table: %w", err)
 	}
+
 	return nil
 }
 
 // cleanupMySQLTestDatabase cleans up the test database
-func (c *Collector) cleanupMySQLTestDatabase(ctx context.Context, db *sql.DB, testDBName string) error {
+func (c *Collector) cleanupMySQLTestDatabase(
+	ctx context.Context,
+	db *sql.DB,
+	testDBName string,
+) error {
 	c.logger.Debugf("Cleaning up test database: %s", testDBName)
 
 	dropDBQuery, err := buildSafeDDL("DROP DATABASE IF EXISTS %s", testDBName, "mysql")
@@ -343,5 +392,6 @@ func (c *Collector) cleanupMySQLTestDatabase(ctx context.Context, db *sql.DB, te
 	}
 
 	c.logger.Debugf("Test database cleaned up: %s", testDBName)
+
 	return nil
 }
