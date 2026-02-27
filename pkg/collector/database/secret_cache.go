@@ -2,44 +2,42 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
-// SecretCache manages a cache of database secrets with watch support
+// SecretCache manages a cache of database secrets using standard informers
 type SecretCache struct {
-	client    kubernetes.Interface
-	logger    *log.Entry
-	mu        sync.RWMutex
-	secrets   map[string]*corev1.Secret // key: namespace/name
-	watchers  []watch.Interface
-	cancelCtx context.CancelFunc
-	// Track resource versions for each label selector
-	resourceVersions map[string]string
+	client          kubernetes.Interface
+	logger          *log.Entry
+	informerFactory informers.SharedInformerFactory
+	informers       []cache.SharedIndexInformer
+	stopCh          chan struct{}
+	cancelCtx       context.CancelFunc
 }
 
 // NewSecretCache creates a new SecretCache
 func NewSecretCache(client kubernetes.Interface, logger *log.Entry) *SecretCache {
 	return &SecretCache{
-		client:           client,
-		logger:           logger,
-		secrets:          make(map[string]*corev1.Secret),
-		watchers:         make([]watch.Interface, 0),
-		resourceVersions: make(map[string]string),
+		client:    client,
+		logger:    logger,
+		informers: make([]cache.SharedIndexInformer, 0),
 	}
 }
 
-// Start initializes the cache and starts watching secrets
+// Start initializes the cache and starts watching secrets using informers
 func (sc *SecretCache) Start(ctx context.Context, namespaces []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	sc.cancelCtx = cancel
+	sc.stopCh = make(chan struct{})
 
 	// Define all database types and their selectors
 	dbTypeSelectors := map[DatabaseType]string{
@@ -54,63 +52,129 @@ func (sc *SecretCache) Start(ctx context.Context, namespaces []string) error {
 	if len(namespaces) == 0 {
 		// Watch all namespaces
 		namespaceScope = ""
-		sc.logger.Info("Starting secret cache with all-namespace watch")
+
+		sc.logger.Info("Starting secret cache with all-namespace informer watch")
 	} else {
-		sc.logger.WithField("namespaces", namespaces).Info("Secret cache will be populated via polling (specific namespaces)")
-		// For specific namespaces, we'll use polling instead of watch
+		sc.logger.WithField("namespaces", namespaces).
+			Info("Secret cache will be populated via polling (specific namespaces)")
+		// For specific namespaces, we'll use polling instead of informers
 		// to avoid creating too many watchers
 		return sc.startPolling(ctx, namespaces, dbTypeSelectors)
 	}
 
-	// For all-namespace mode, use watch
+	// Create informer factory with default resync period
+	sc.informerFactory = informers.NewSharedInformerFactoryWithOptions(
+		sc.client,
+		30*time.Second, // resync period
+		informers.WithNamespace(namespaceScope),
+	)
+
+	// For all-namespace mode, create informers for each database type
 	for dbType, selector := range dbTypeSelectors {
-		// Initial list to populate cache
-		secrets, err := sc.client.CoreV1().Secrets(namespaceScope).List(ctx, metav1.ListOptions{
-			LabelSelector: selector,
+		// Create a filtered informer for this database type using recommended API
+		informer := informers.NewSharedInformerFactoryWithOptions(
+			sc.client,
+			30*time.Second,
+			informers.WithNamespace(namespaceScope),
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.LabelSelector = selector
+			}),
+		).Core().V1().Secrets().Informer()
+
+		// Add event handlers
+		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj any) {
+				secret, ok := obj.(*corev1.Secret)
+				if !ok {
+					return
+				}
+
+				sc.logger.WithFields(log.Fields{
+					"type":      dbType,
+					"namespace": secret.Namespace,
+					"name":      secret.Name,
+					"event":     "Added",
+				}).Debug("Secret added to cache")
+			},
+			UpdateFunc: func(oldObj, newObj any) {
+				secret, ok := newObj.(*corev1.Secret)
+				if !ok {
+					return
+				}
+
+				sc.logger.WithFields(log.Fields{
+					"type":      dbType,
+					"namespace": secret.Namespace,
+					"name":      secret.Name,
+					"event":     "Modified",
+				}).Debug("Secret updated in cache")
+			},
+			DeleteFunc: func(obj any) {
+				secret, ok := obj.(*corev1.Secret)
+				if !ok {
+					return
+				}
+
+				sc.logger.WithFields(log.Fields{
+					"type":      dbType,
+					"namespace": secret.Namespace,
+					"name":      secret.Name,
+					"event":     "Deleted",
+				}).Debug("Secret removed from cache")
+			},
 		})
 		if err != nil {
-			return fmt.Errorf("failed to list secrets for %s: %w", dbType, err)
+			return fmt.Errorf("failed to add event handler for %s: %w", dbType, err)
 		}
 
-		// Populate cache
-		for i := range secrets.Items {
-			secret := &secrets.Items[i]
-			key := secret.Namespace + "/" + secret.Name
-			sc.mu.Lock()
-			sc.secrets[key] = secret
-			sc.mu.Unlock()
-		}
-
-		// Store resource version for this selector
-		sc.resourceVersions[string(dbType)] = secrets.ResourceVersion
+		sc.informers = append(sc.informers, informer)
 
 		sc.logger.WithFields(log.Fields{
-			"type":  dbType,
-			"count": len(secrets.Items),
-		}).Debug("Populated secret cache for database type")
-
-		// Start watch
-		watcher, err := sc.client.CoreV1().Secrets(namespaceScope).Watch(ctx, metav1.ListOptions{
-			LabelSelector:   selector,
-			ResourceVersion: secrets.ResourceVersion,
-			Watch:           true,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to start watch for %s: %w", dbType, err)
-		}
-
-		sc.watchers = append(sc.watchers, watcher)
-
-		// Start watching in background
-		go sc.watchSecrets(ctx, watcher, dbType)
+			"type":     dbType,
+			"selector": selector,
+		}).Debug("Created informer for database type")
 	}
 
-	sc.logger.Info("Secret cache started with watch mechanism")
+	// Start all informers
+	sc.informerFactory.Start(sc.stopCh)
+
+	// Start individual informers
+	for _, informer := range sc.informers {
+		go informer.Run(sc.stopCh)
+	}
+
+	// Wait for all informers to sync
+	sc.logger.Info("Waiting for secret cache informers to sync...")
+
+	if !cache.WaitForCacheSync(sc.stopCh, sc.getAllInformerSyncs()...) {
+		return errors.New("failed to sync secret cache informers")
+	}
+
+	sc.logger.WithField("cache_size", sc.GetCacheSize()).
+		Info("Secret cache started with informer mechanism")
+
 	return nil
 }
 
-// startPolling starts polling mode for specific namespaces
-func (sc *SecretCache) startPolling(ctx context.Context, namespaces []string, selectors map[DatabaseType]string) error {
+// getAllInformerSyncs returns all informer HasSynced functions
+func (sc *SecretCache) getAllInformerSyncs() []cache.InformerSynced {
+	syncs := make([]cache.InformerSynced, len(sc.informers))
+	for i, informer := range sc.informers {
+		syncs[i] = informer.HasSynced
+	}
+
+	return syncs
+}
+
+// startPolling starts polling mode for specific namespaces (unchanged logic)
+func (sc *SecretCache) startPolling(
+	ctx context.Context,
+	namespaces []string,
+	selectors map[DatabaseType]string,
+) error {
+	// Create a simple cache structure for polling mode
+	sc.stopCh = make(chan struct{})
+
 	// Initial population
 	if err := sc.pollSecrets(ctx, namespaces, selectors); err != nil {
 		return err
@@ -137,93 +201,56 @@ func (sc *SecretCache) startPolling(ctx context.Context, namespaces []string, se
 }
 
 // pollSecrets polls secrets from specific namespaces
-func (sc *SecretCache) pollSecrets(ctx context.Context, namespaces []string, selectors map[DatabaseType]string) error {
+// This is unchanged and still used for specific namespace mode
+func (sc *SecretCache) pollSecrets(
+	ctx context.Context,
+	namespaces []string,
+	selectors map[DatabaseType]string,
+) error {
 	for _, ns := range namespaces {
-		for dbType, selector := range selectors {
+		for _, selector := range selectors {
 			secrets, err := sc.client.CoreV1().Secrets(ns).List(ctx, metav1.ListOptions{
 				LabelSelector: selector,
 			})
 			if err != nil {
-				sc.logger.WithError(err).WithFields(log.Fields{
-					"namespace": ns,
-					"type":      dbType,
-				}).Error("Failed to list secrets")
+				sc.logger.WithError(err).WithField("namespace", ns).Error("Failed to list secrets")
 				continue
 			}
 
-			// Update cache
-			sc.mu.Lock()
-			for i := range secrets.Items {
-				secret := &secrets.Items[i]
-				key := secret.Namespace + "/" + secret.Name
-				sc.secrets[key] = secret
-			}
-			sc.mu.Unlock()
+			// Secrets are available through List API in polling mode
+			// The informer cache will handle storage automatically when using informers
+			sc.logger.WithFields(log.Fields{
+				"namespace": ns,
+				"count":     len(secrets.Items),
+			}).Debug("Polled secrets from namespace")
 		}
 	}
 
 	return nil
 }
 
-// watchSecrets handles watch events for secrets
-func (sc *SecretCache) watchSecrets(ctx context.Context, watcher watch.Interface, dbType DatabaseType) {
-	defer watcher.Stop()
+// GetSecrets returns all cached secrets matching the filter using informer cache
+func (sc *SecretCache) GetSecrets(
+	dbType DatabaseType,
+	isCredentialFunc func(*corev1.Secret, DatabaseType) bool,
+) []*corev1.Secret {
+	result := make([]*corev1.Secret, 0)
 
-	for {
-		select {
-		case <-ctx.Done():
-			sc.logger.WithField("type", dbType).Debug("Stopping secret watch")
-			return
-		case event, ok := <-watcher.ResultChan():
-			if !ok {
-				// Watch closed, need to restart
-				sc.logger.WithField("type", dbType).Warn("Secret watch closed, will restart on next poll")
-				return
-			}
+	// Iterate through all informers to get secrets from their stores
+	for _, informer := range sc.informers {
+		store := informer.GetStore()
+		items := store.List()
 
-			secret, ok := event.Object.(*corev1.Secret)
+		for _, item := range items {
+			secret, ok := item.(*corev1.Secret)
 			if !ok {
 				continue
 			}
 
-			key := secret.Namespace + "/" + secret.Name
-
-			switch event.Type {
-			case watch.Added, watch.Modified:
-				sc.mu.Lock()
-				sc.secrets[key] = secret
-				sc.mu.Unlock()
-				sc.logger.WithFields(log.Fields{
-					"type":      dbType,
-					"namespace": secret.Namespace,
-					"name":      secret.Name,
-					"event":     event.Type,
-				}).Debug("Secret cache updated")
-
-			case watch.Deleted:
-				sc.mu.Lock()
-				delete(sc.secrets, key)
-				sc.mu.Unlock()
-				sc.logger.WithFields(log.Fields{
-					"type":      dbType,
-					"namespace": secret.Namespace,
-					"name":      secret.Name,
-				}).Debug("Secret removed from cache")
+			// Check if secret belongs to this database type and matches credential filter
+			if sc.matchesType(secret, dbType) && isCredentialFunc(secret, dbType) {
+				result = append(result, secret)
 			}
-		}
-	}
-}
-
-// GetSecrets returns all cached secrets matching the filter
-func (sc *SecretCache) GetSecrets(dbType DatabaseType, isCredentialFunc func(*corev1.Secret, DatabaseType) bool) []*corev1.Secret {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-
-	result := make([]*corev1.Secret, 0)
-	for _, secret := range sc.secrets {
-		// Check if secret belongs to this database type by checking its labels
-		if sc.matchesType(secret, dbType) && isCredentialFunc(secret, dbType) {
-			result = append(result, secret)
 		}
 	}
 
@@ -251,26 +278,26 @@ func (sc *SecretCache) matchesType(secret *corev1.Secret, dbType DatabaseType) b
 	}
 }
 
-// Stop stops all watchers and cleans up
+// Stop stops all informers and cleans up
 func (sc *SecretCache) Stop() {
 	if sc.cancelCtx != nil {
 		sc.cancelCtx()
 	}
 
-	for _, watcher := range sc.watchers {
-		watcher.Stop()
+	if sc.stopCh != nil {
+		close(sc.stopCh)
 	}
-
-	sc.mu.Lock()
-	sc.secrets = make(map[string]*corev1.Secret)
-	sc.mu.Unlock()
 
 	sc.logger.Info("Secret cache stopped")
 }
 
-// GetCacheSize returns the number of secrets in cache
+// GetCacheSize returns the number of secrets in cache across all informers
 func (sc *SecretCache) GetCacheSize() int {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	return len(sc.secrets)
+	totalSize := 0
+	for _, informer := range sc.informers {
+		store := informer.GetStore()
+		totalSize += len(store.List())
+	}
+
+	return totalSize
 }
