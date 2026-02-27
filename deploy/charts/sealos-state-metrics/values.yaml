@@ -63,7 +63,7 @@ serviceMonitor:
   relabelings: []
 
 vmServiceScrape:
-  enabled: false
+  enabled: true
   namespace: ""
   labels: {}
   interval: 30s
@@ -158,6 +158,13 @@ collectors:
     checkTimeout: "10s"
     checkInterval: "5m"
     namespaces: []  # Empty means all namespaces
+    # Concurrency settings for database connection checks
+    # Controls maximum concurrent connections per database type
+    # Higher values allow faster checking of many databases but consume more resources
+    mysqlConcurrency: 50        # Default: 50 concurrent MySQL connections
+    postgresqlConcurrency: 50   # Default: 50 concurrent PostgreSQL connections
+    mongodbConcurrency: 50      # Default: 50 concurrent MongoDB connections
+    redisConcurrency: 100       # Default: 100 concurrent Redis connections (Redis is typically faster)
 
   crds:
     crds:
