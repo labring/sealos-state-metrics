@@ -96,7 +96,7 @@ config:
     burst: 100
 
   metrics:
-    namespace: ""
+    namespace: "sealos"
 
   logging:
     level: "info"
