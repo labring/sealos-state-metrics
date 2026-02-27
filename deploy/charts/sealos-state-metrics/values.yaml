@@ -229,8 +229,8 @@ collectors:
       - name: devbox
         gvr:
           group: devbox.sealos.io
-          version: v1alpha1
-          resource: Devbox
+          version: v1alpha2
+          resource: devboxes
         namespaces: [ ]
         resyncPeriod: 10m
 
