@@ -66,6 +66,10 @@ type Collector struct {
 		available   int
 		unavailable int
 	}
+
+	// Secret cache and preflight checker
+	secretCache      *SecretCache
+	preflightChecker *PreflightChecker
 }
 
 // initMetrics initializes Prometheus metric descriptors
@@ -124,6 +128,18 @@ func (c *Collector) Interval() time.Duration {
 
 // pollLoop periodically checks database connectivity
 func (c *Collector) pollLoop(ctx context.Context) {
+	// Initialize secret cache and preflight checker
+	c.secretCache = NewSecretCache(c.client, c.logger)
+	c.preflightChecker = NewPreflightChecker(c.client, c.logger)
+
+	// Start secret cache
+	if err := c.secretCache.Start(ctx, c.config.Namespaces); err != nil {
+		c.logger.WithError(err).Error("Failed to start secret cache, falling back to direct queries")
+		c.secretCache = nil // Disable cache on error
+	} else {
+		c.logger.WithField("cache_size", c.secretCache.GetCacheSize()).Info("Secret cache started successfully")
+	}
+
 	// Initial poll
 	_ = c.Poll(ctx)
 	c.SetReady()
@@ -139,6 +155,9 @@ func (c *Collector) pollLoop(ctx context.Context) {
 			}
 		case <-ctx.Done():
 			c.logger.Info("Context cancelled, stopping database poll loop")
+			if c.secretCache != nil {
+				c.secretCache.Stop()
+			}
 			return
 		}
 	}
@@ -211,7 +230,41 @@ func (c *Collector) collectDatabaseTasks(ctx context.Context) ([]DatabaseTask, e
 func (c *Collector) collectAllNamespaceTasks(ctx context.Context) ([]DatabaseTask, error) {
 	var tasks []DatabaseTask
 
-	// Define all database types and their selectors
+	// Define all database types
+	dbTypes := []DatabaseType{
+		DatabaseTypeMySQL,
+		DatabaseTypePostgreSQL,
+		DatabaseTypeMongoDB,
+		DatabaseTypeRedis,
+	}
+
+	// Use cache if available
+	if c.secretCache != nil {
+		c.logger.Debug("Using secret cache to collect tasks")
+		for _, dbType := range dbTypes {
+			secrets := c.secretCache.GetSecrets(dbType, c.isCredentialSecret)
+
+			c.logger.WithFields(log.Fields{
+				"type":  dbType,
+				"count": len(secrets),
+			}).Debug("Retrieved secrets from cache")
+
+			for _, secret := range secrets {
+				dbName := c.extractDatabaseName(secret, dbType)
+				tasks = append(tasks, DatabaseTask{
+					Namespace:    secret.Namespace,
+					DatabaseName: dbName,
+					DatabaseType: dbType,
+					Secret:       secret,
+				})
+			}
+		}
+		return tasks, nil
+	}
+
+	// Fallback to direct API calls if cache is not available
+	c.logger.Debug("Cache not available, using direct API calls")
+
 	dbTypeSelectors := map[DatabaseType]string{
 		DatabaseTypeMySQL:      "apps.kubeblocks.io/cluster-type=mysql",
 		DatabaseTypePostgreSQL: "app.kubernetes.io/name=postgresql",
@@ -491,11 +544,27 @@ func (c *Collector) checkDatabaseConnectivity(
 		Connected:    false,
 	}
 
-	// Create context with timeout
+	startTime := time.Now()
+
+	// Preflight checks (fast-fail)
+	if c.preflightChecker != nil {
+		if preflightErr := c.preflightChecker.CheckDatabase(ctx, namespace, dbName, dbType, secret); preflightErr != nil {
+			status.ResponseTime = time.Since(startTime).Seconds()
+			status.Connected = false
+			status.Error = preflightErr.Error()
+			c.logger.WithFields(log.Fields{
+				"namespace": namespace,
+				"database":  dbName,
+				"type":      dbType,
+				"error":     preflightErr.Type,
+			}).Debug("Database preflight check failed (fast-fail)")
+			return status
+		}
+	}
+
+	// Create context with timeout for actual connection check
 	checkCtx, cancel := context.WithTimeout(ctx, c.config.CheckTimeout)
 	defer cancel()
-
-	startTime := time.Now()
 
 	var err error
 	switch dbType {
@@ -520,7 +589,7 @@ func (c *Collector) checkDatabaseConnectivity(
 			"namespace": namespace,
 			"database":  dbName,
 			"type":      dbType,
-		}).WithError(err).Warn("Database connectivity check failed")
+		}).WithError(err).Debug("Database connectivity check failed")
 	} else {
 		status.Connected = true
 		status.Error = ""
