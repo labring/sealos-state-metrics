@@ -9,13 +9,24 @@ type Config struct {
 	CheckTimeout time.Duration `yaml:"checkTimeout" json:"check_timeout" env:"CHECK_TIMEOUT"`
 	// List of namespaces to scan. Empty means all namespaces
 	Namespaces []string `yaml:"namespaces" json:"namespaces" env:"NAMESPACES" envSeparator:","`
+
+	// Concurrency settings for database connection checks
+	// Controls maximum concurrent connections per database type
+	MySQLConcurrency      int `yaml:"mysqlConcurrency" json:"mysql_concurrency" env:"MYSQL_CONCURRENCY"`
+	PostgreSQLConcurrency int `yaml:"postgresqlConcurrency" json:"postgresql_concurrency" env:"POSTGRESQL_CONCURRENCY"`
+	MongoDBConcurrency    int `yaml:"mongodbConcurrency" json:"mongodb_concurrency" env:"MONGODB_CONCURRENCY"`
+	RedisConcurrency      int `yaml:"redisConcurrency" json:"redis_concurrency" env:"REDIS_CONCURRENCY"`
 }
 
 // NewDefaultConfig returns the default configuration
 func NewDefaultConfig() *Config {
 	return &Config{
-		CheckInterval: 5 * time.Minute,
-		CheckTimeout:  10 * time.Second,
-		Namespaces:    []string{}, // Empty means all namespaces
+		CheckInterval:         5 * time.Minute,
+		CheckTimeout:          10 * time.Second,
+		Namespaces:            []string{}, // Empty means all namespaces
+		MySQLConcurrency:      50,         // Default: 50 concurrent MySQL connections
+		PostgreSQLConcurrency: 50,         // Default: 50 concurrent PostgreSQL connections
+		MongoDBConcurrency:    50,         // Default: 50 concurrent MongoDB connections
+		RedisConcurrency:      100,        // Default: 100 concurrent Redis connections (Redis is typically faster)
 	}
 }
