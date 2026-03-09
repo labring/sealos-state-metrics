@@ -14,7 +14,7 @@ import (
 // MongoDBConnectionInfo holds MongoDB connection information
 type MongoDBConnectionInfo struct {
 	Username string
-	Password string
+	password string
 	Host     string
 	Port     string
 	Endpoint string
@@ -108,7 +108,7 @@ func (c *Collector) parseMongoDBConnectionInfo(
 
 	return &MongoDBConnectionInfo{
 		Username: username,
-		Password: password,
+		password: password,
 		Host:     host,
 		Port:     port,
 		Endpoint: fullEndpoint,

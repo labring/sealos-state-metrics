@@ -53,6 +53,7 @@ func parseMonitoredDomains(values []string) ([]monitoredDomain, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if domain.endpoint == "" {
 			continue
 		}
@@ -87,7 +88,10 @@ func parseDomainTarget(value string) (DomainTarget, error) {
 	}
 
 	if strings.Contains(raw, "://") || strings.ContainsAny(raw, "/?#") {
-		return DomainTarget{}, fmt.Errorf("invalid domain endpoint %q: only host or host:port is supported", value)
+		return DomainTarget{}, fmt.Errorf(
+			"invalid domain endpoint %q: only host or host:port is supported",
+			value,
+		)
 	}
 
 	host, port, err := net.SplitHostPort(raw)
@@ -110,7 +114,10 @@ func parseDomainTarget(value string) (DomainTarget, error) {
 				return newDomainTarget(raw, defaultHTTPSPort, value)
 			}
 
-			return DomainTarget{}, fmt.Errorf("invalid domain endpoint %q: IPv6 addresses with ports must use [host]:port", value)
+			return DomainTarget{}, fmt.Errorf(
+				"invalid domain endpoint %q: IPv6 addresses with ports must use [host]:port",
+				value,
+			)
 		}
 	}
 
@@ -125,8 +132,13 @@ func newDomainTarget(host string, port int, original string) (DomainTarget, erro
 	if host == "" {
 		return DomainTarget{}, fmt.Errorf("invalid domain endpoint %q: host is empty", original)
 	}
+
 	if port < 1 || port > 65535 {
-		return DomainTarget{}, fmt.Errorf("invalid domain endpoint %q: port %d out of range", original, port)
+		return DomainTarget{}, fmt.Errorf(
+			"invalid domain endpoint %q: port %d out of range",
+			original,
+			port,
+		)
 	}
 
 	return DomainTarget{
@@ -140,6 +152,7 @@ func parsePort(port, original string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("invalid domain endpoint %q: invalid port %q", original, port)
 	}
+
 	if portNum < 1 || portNum > 65535 {
 		return 0, fmt.Errorf("invalid domain endpoint %q: port %d out of range", original, portNum)
 	}

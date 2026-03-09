@@ -149,7 +149,13 @@ func (dc *DomainChecker) CheckIPs(
 
 		// HTTP check for this specific IP
 		if dc.checkHTTP {
-			result := util.CheckHTTPWithIP(ctx, domain.target.Host, domain.target.Port, ip, dc.timeout)
+			result := util.CheckHTTPWithIP(
+				ctx,
+				domain.target.Host,
+				domain.target.Port,
+				ip,
+				dc.timeout,
+			)
 			health.HTTPOk = result.Success
 			health.HTTPError = result.Error
 			health.ResponseTime = result.ResponseTime

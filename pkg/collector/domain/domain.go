@@ -91,7 +91,6 @@ func (c *Collector) Poll(ctx context.Context) error {
 	// Check domains concurrently
 	var wg sync.WaitGroup
 	for _, domain := range c.runtime.domains {
-		domain := domain
 		wg.Go(func() {
 			domainHealth, ipHealths := c.checker.CheckIPs(ctx, domain, c.logger)
 

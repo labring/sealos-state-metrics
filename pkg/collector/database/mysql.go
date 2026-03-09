@@ -14,7 +14,7 @@ import (
 // MySQLConnectionInfo holds MySQL connection information
 type MySQLConnectionInfo struct {
 	Username string
-	Password string
+	password string
 	Host     string
 	Port     string
 	Endpoint string
@@ -124,7 +124,7 @@ func (c *Collector) parseMySQLConnectionInfo(secret *corev1.Secret) (*MySQLConne
 
 	return &MySQLConnectionInfo{
 		Username: username,
-		Password: password,
+		password: password,
 		Host:     host,
 		Port:     port,
 		Endpoint: fullEndpoint,
@@ -213,7 +213,7 @@ func (c *Collector) reconnectToDatabase(
 	// Build DSN with database name
 	dsnWithDB := fmt.Sprintf("%s:%s@tcp(%s)/%s",
 		connInfo.Username,
-		connInfo.Password,
+		connInfo.password,
 		connInfo.Endpoint,
 		dbName,
 	)

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -39,7 +40,12 @@ func NewPreflightChecker(client kubernetes.Interface, logger *log.Entry) *Prefli
 
 // CheckDatabase performs preflight checks on a database connection
 // Returns nil if all checks pass, otherwise returns a PreflightError
-func (pc *PreflightChecker) CheckDatabase(ctx context.Context, namespace, dbName string, dbType DatabaseType, secret *corev1.Secret) *PreflightError {
+func (pc *PreflightChecker) CheckDatabase(
+	ctx context.Context,
+	namespace, dbName string,
+	dbType DatabaseType,
+	secret *corev1.Secret,
+) *PreflightError {
 	// Extract connection info
 	host, err := pc.extractHost(secret, dbType)
 	if err != nil {
@@ -58,6 +64,7 @@ func (pc *PreflightChecker) CheckDatabase(ctx context.Context, namespace, dbName
 				Message: err.Error(),
 			}
 		}
+
 		return nil
 	}
 
@@ -84,7 +91,10 @@ func (pc *PreflightChecker) CheckDatabase(ctx context.Context, namespace, dbName
 }
 
 // extractHost extracts the hostname from the secret based on database type
-func (pc *PreflightChecker) extractHost(secret *corev1.Secret, dbType DatabaseType) (string, error) {
+func (pc *PreflightChecker) extractHost(
+	secret *corev1.Secret,
+	dbType DatabaseType,
+) (string, error) {
 	data := secret.Data
 
 	switch dbType {
@@ -97,27 +107,32 @@ func (pc *PreflightChecker) extractHost(secret *corev1.Secret, dbType DatabaseTy
 		if connStr, ok := data["url"]; ok {
 			return pc.parseHostFromURL(string(connStr))
 		}
-		return "", fmt.Errorf("no host or url found in secret")
+
+		return "", errors.New("no host or url found in secret")
 
 	case DatabaseTypeMongoDB:
 		// MongoDB uses connection URI
 		if uri, ok := data["url"]; ok {
 			return pc.parseHostFromURL(string(uri))
 		}
+
 		if host, ok := data["host"]; ok {
 			return string(host), nil
 		}
-		return "", fmt.Errorf("no url or host found in secret")
+
+		return "", errors.New("no url or host found in secret")
 
 	case DatabaseTypeRedis:
 		// Redis typically has host field
 		if host, ok := data["host"]; ok {
 			return string(host), nil
 		}
+
 		if connStr, ok := data["url"]; ok {
 			return pc.parseHostFromURL(string(connStr))
 		}
-		return "", fmt.Errorf("no host or url found in secret")
+
+		return "", errors.New("no host or url found in secret")
 
 	default:
 		return "", fmt.Errorf("unsupported database type: %s", dbType)
@@ -142,6 +157,7 @@ func (pc *PreflightChecker) parseHostFromURL(urlStr string) (string, error) {
 	if idx := strings.Index(urlStr, "/"); idx != -1 {
 		urlStr = urlStr[:idx]
 	}
+
 	if idx := strings.Index(urlStr, "?"); idx != -1 {
 		urlStr = urlStr[:idx]
 	}
@@ -154,7 +170,7 @@ func (pc *PreflightChecker) parseHostFromURL(urlStr string) (string, error) {
 	}
 
 	if host == "" {
-		return "", fmt.Errorf("failed to parse host from URL")
+		return "", errors.New("failed to parse host from URL")
 	}
 
 	return host, nil
@@ -186,28 +202,38 @@ func (pc *PreflightChecker) checkDNS(host string) error {
 	defer cancel()
 
 	resolver := &net.Resolver{}
+
 	_, err := resolver.LookupHost(ctx, host)
 	if err != nil {
-		return fmt.Errorf("DNS lookup failed for %s: %v", host, err)
+		return fmt.Errorf("DNS lookup failed for %s: %w", host, err)
 	}
 
 	return nil
 }
 
 // checkServiceExists checks if a service exists
-func (pc *PreflightChecker) checkServiceExists(ctx context.Context, namespace, serviceName string) error {
+func (pc *PreflightChecker) checkServiceExists(
+	ctx context.Context,
+	namespace, serviceName string,
+) error {
 	_, err := pc.client.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("service %s/%s not found: %v", namespace, serviceName, err)
+		return fmt.Errorf("service %s/%s not found: %w", namespace, serviceName, err)
 	}
+
 	return nil
 }
 
 // checkServiceEndpoints checks if a service has ready endpoints
-func (pc *PreflightChecker) checkServiceEndpoints(ctx context.Context, namespace, serviceName string) error {
-	endpoints, err := pc.client.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+func (pc *PreflightChecker) checkServiceEndpoints(
+	ctx context.Context,
+	namespace, serviceName string,
+) error {
+	endpoints, err := pc.client.CoreV1().
+		Endpoints(namespace).
+		Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("endpoints %s/%s not found: %v", namespace, serviceName, err)
+		return fmt.Errorf("endpoints %s/%s not found: %w", namespace, serviceName, err)
 	}
 
 	// Check if there are any ready endpoints

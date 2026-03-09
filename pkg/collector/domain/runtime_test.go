@@ -1,3 +1,4 @@
+//nolint:testpackage // white-box tests intentionally exercise internal parsing helpers
 package domain
 
 import (
@@ -98,6 +99,7 @@ func TestParseDomainTarget(t *testing.T) {
 			if target.Host != tt.wantHost {
 				t.Fatalf("target.Host = %q, want %q", target.Host, tt.wantHost)
 			}
+
 			if target.Port != tt.wantPort {
 				t.Fatalf("target.Port = %d, want %d", target.Port, tt.wantPort)
 			}
@@ -129,7 +131,8 @@ func TestNewRuntimeConfig(t *testing.T) {
 	}
 
 	first := runtimeCfg.domains[0]
-	if first.endpoint != "example.com" || first.target.Host != "example.com" || first.target.Port != 443 {
+	if first.endpoint != "example.com" || first.target.Host != "example.com" ||
+		first.target.Port != 443 {
 		t.Fatalf("unexpected first domain: %#v", first)
 	}
 
@@ -143,12 +146,15 @@ func TestNewRuntimeConfig(t *testing.T) {
 	if runtimeCfg.checkTimeout != 7*time.Second {
 		t.Fatalf("checkTimeout = %v, want %v", runtimeCfg.checkTimeout, 7*time.Second)
 	}
+
 	if runtimeCfg.checkInterval != 11*time.Minute {
 		t.Fatalf("checkInterval = %v, want %v", runtimeCfg.checkInterval, 11*time.Minute)
 	}
+
 	if !runtimeCfg.includeCertCheck {
 		t.Fatal("includeCertCheck = false, want true")
 	}
+
 	if runtimeCfg.includeHTTPCheck {
 		t.Fatal("includeHTTPCheck = true, want false")
 	}

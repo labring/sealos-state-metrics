@@ -23,6 +23,14 @@ type HTTPCheckResult struct {
 
 // CheckHTTP performs an HTTP/HTTPS health check
 func CheckHTTP(ctx context.Context, url string, timeout time.Duration) *HTTPCheckResult {
+	parsedURL, err := validateMonitoringURL(url)
+	if err != nil {
+		return &HTTPCheckResult{
+			Success: false,
+			Error:   fmt.Sprintf("invalid request target: %v", err),
+		}
+	}
+
 	client := &http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
@@ -35,7 +43,7 @@ func CheckHTTP(ctx context.Context, url string, timeout time.Duration) *HTTPChec
 
 	start := time.Now()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsedURL.String(), nil)
 	if err != nil {
 		return &HTTPCheckResult{
 			Success: false,
@@ -43,6 +51,7 @@ func CheckHTTP(ctx context.Context, url string, timeout time.Duration) *HTTPChec
 		}
 	}
 
+	//nolint:gosec // validated monitoring target; outbound HTTP checks are intentional collector behavior
 	resp, err := client.Do(req)
 	responseTime := time.Since(start)
 
@@ -71,6 +80,13 @@ func CheckHTTPWithIP(
 	ip string,
 	timeout time.Duration,
 ) *HTTPCheckResult {
+	if err := validateMonitoringTarget(host, port, ip); err != nil {
+		return &HTTPCheckResult{
+			Success: false,
+			Error:   fmt.Sprintf("invalid request target: %v", err),
+		}
+	}
+
 	// Create a transport that dials the specific IP
 	client := &http.Client{
 		Timeout: timeout,
@@ -109,6 +125,7 @@ func CheckHTTPWithIP(
 	// Preserve the configured authority for Host routing.
 	req.Host = formatHTTPSAuthority(host, port)
 
+	//nolint:gosec // validated monitoring target; outbound HTTP checks are intentional collector behavior
 	resp, err := client.Do(req)
 	responseTime := time.Since(start)
 
@@ -182,4 +199,66 @@ func formatHTTPSAuthority(host string, port int) string {
 	}
 
 	return net.JoinHostPort(host, strconv.Itoa(port))
+}
+
+func validateMonitoringURL(rawURL string) (*url.URL, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme %q", parsedURL.Scheme)
+	}
+
+	if parsedURL.Host == "" {
+		return nil, errors.New("host is empty")
+	}
+
+	if parsedURL.User != nil {
+		return nil, errors.New("userinfo is not supported")
+	}
+
+	hostname := parsedURL.Hostname()
+	if hostname == "" {
+		return nil, errors.New("hostname is empty")
+	}
+
+	if net.ParseIP(hostname) == nil {
+		if err := validateHostname(hostname); err != nil {
+			return nil, err
+		}
+	}
+
+	return parsedURL, nil
+}
+
+func validateMonitoringTarget(host string, port int, ip string) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("port %d out of range", port)
+	}
+
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("invalid IP %q", ip)
+	}
+
+	if net.ParseIP(host) == nil {
+		if err := validateHostname(host); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateHostname(host string) error {
+	if strings.TrimSpace(host) == "" {
+		return errors.New("host is empty")
+	}
+
+	if strings.ContainsAny(host, "/?#@") {
+		return fmt.Errorf("host %q contains invalid characters", host)
+	}
+
+	return nil
 }
