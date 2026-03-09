@@ -64,16 +64,13 @@ func (s *Server) setupRoutes(
 func cachedLoggerNeedColor(l *log.Logger) func() bool {
 	needColor := atomic.Bool{}
 	cachedFormatter := atomic.Pointer[log.Formatter]{}
-	oldFormatter := l.Formatter
-	cachedFormatter.Store(&oldFormatter)
-	needColor.Store(loggerNeedColor(oldFormatter))
+	cachedFormatter.Store(&l.Formatter)
+	needColor.Store(loggerNeedColor(l.Formatter))
 
 	return func() bool {
-		formatter := l.Formatter
-
-		if cachedFormatter.Load() != &formatter {
-			cachedFormatter.Store(&formatter)
-			color := loggerNeedColor(formatter)
+		if cachedFormatter.Load() != &l.Formatter {
+			cachedFormatter.Store(&l.Formatter)
+			color := loggerNeedColor(l.Formatter)
 			needColor.Store(color)
 			return color
 		}
