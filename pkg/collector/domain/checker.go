@@ -61,13 +61,13 @@ func NewDomainChecker(timeout time.Duration, checkHTTP, checkDNS, checkCert bool
 // CheckIPs performs all enabled checks on a domain for each of its IPs
 func (dc *DomainChecker) CheckIPs(
 	ctx context.Context,
-	domain string,
+	domain monitoredDomain,
 	logger *log.Entry,
 ) (*DomainHealth, []*IPHealth) {
 	now := time.Now()
 
 	domainHealth := &DomainHealth{
-		Domain:      domain,
+		Domain:      domain.endpoint,
 		ResolveOk:   true,
 		LastChecked: now,
 	}
@@ -75,10 +75,12 @@ func (dc *DomainChecker) CheckIPs(
 	// First, get the IPs for the domain
 	var ips []string
 	if dc.checkDNS || dc.checkHTTP {
-		dnsResult := util.CheckDNS(ctx, domain, dc.timeout)
+		dnsResult := util.CheckDNS(ctx, domain.target.Host, dc.timeout)
 		if !dnsResult.Success {
 			logger.WithFields(log.Fields{
-				"domain": domain,
+				"domain": domain.endpoint,
+				"host":   domain.target.Host,
+				"port":   domain.target.Port,
 				"error":  dnsResult.Error,
 			}).Warn("DNS resolution failed")
 
@@ -90,7 +92,7 @@ func (dc *DomainChecker) CheckIPs(
 			// Return a health record indicating DNS failure
 			return domainHealth, []*IPHealth{
 				{
-					Domain:        domain,
+					Domain:        domain.endpoint,
 					IP:            "",
 					HTTPOk:        false,
 					HTTPError:     "DNS resolution failed: " + dnsResult.Error,
@@ -105,7 +107,7 @@ func (dc *DomainChecker) CheckIPs(
 		// Check if IP list is empty
 		if len(ips) == 0 {
 			logger.WithFields(log.Fields{
-				"domain": domain,
+				"domain": domain.endpoint,
 			}).Warn("DNS resolution returned no IPs")
 
 			// Mark as resolved but with 0 IPs
@@ -115,7 +117,7 @@ func (dc *DomainChecker) CheckIPs(
 			// Return a health record indicating no IPs
 			return domainHealth, []*IPHealth{
 				{
-					Domain:        domain,
+					Domain:        domain.endpoint,
 					IP:            "",
 					HTTPOk:        false,
 					HTTPError:     "DNS resolution returned no IPs",
@@ -133,21 +135,21 @@ func (dc *DomainChecker) CheckIPs(
 	)
 
 	if dc.checkCert {
-		certInfo, certErr = util.GetTLSCert(domain, dc.timeout)
+		certInfo, certErr = util.GetTLSCert(domain.target.Host, domain.target.Port, dc.timeout)
 	}
 
 	// Check each IP individually
 	results := make([]*IPHealth, 0, len(ips))
 	for _, ip := range ips {
 		health := &IPHealth{
-			Domain:      domain,
+			Domain:      domain.endpoint,
 			IP:          ip,
 			LastChecked: now,
 		}
 
 		// HTTP check for this specific IP
 		if dc.checkHTTP {
-			result := util.CheckHTTPWithIP(ctx, domain, ip, dc.timeout)
+			result := util.CheckHTTPWithIP(ctx, domain.target.Host, domain.target.Port, ip, dc.timeout)
 			health.HTTPOk = result.Success
 			health.HTTPError = result.Error
 			health.ResponseTime = result.ResponseTime
@@ -160,7 +162,7 @@ func (dc *DomainChecker) CheckIPs(
 			}
 
 			logger.WithFields(log.Fields{
-				"domain":       domain,
+				"domain":       domain.endpoint,
 				"ip":           ip,
 				"success":      health.HTTPOk,
 				"errorType":    health.HTTPErrorType,
@@ -187,7 +189,7 @@ func (dc *DomainChecker) CheckIPs(
 			}
 
 			logger.WithFields(log.Fields{
-				"domain":    domain,
+				"domain":    domain.endpoint,
 				"ip":        ip,
 				"success":   health.CertOk,
 				"errorType": health.CertErrorType,

@@ -26,23 +26,28 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			Debug("Failed to load domain collector config, using defaults")
 	}
 
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	c := &Collector{
 		BaseCollector: base.NewBaseCollector(
 			collectorName,
 			factoryCtx.Logger,
 			base.WithWaitReadyOnCollect(true),
 		),
-		config: cfg,
-		ips:    make(map[string]*IPHealth),
-		logger: factoryCtx.Logger,
+		runtime: runtimeCfg,
+		ips:     make(map[string]*IPHealth),
+		logger:  factoryCtx.Logger,
 	}
 
 	// Create checker
 	c.checker = NewDomainChecker(
-		cfg.CheckTimeout,
-		cfg.IncludeHTTPCheck,
+		runtimeCfg.checkTimeout,
+		runtimeCfg.includeHTTPCheck,
 		true, // checkDNS is always true as we need IPs
-		cfg.IncludeCertCheck,
+		runtimeCfg.includeCertCheck,
 	)
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
