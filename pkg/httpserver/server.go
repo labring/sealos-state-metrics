@@ -25,6 +25,8 @@ type Config struct {
 	ReadHeaderTimeout time.Duration
 	// Name for logging (e.g., "main", "debug", "pprof")
 	Name string
+	// Logger is used for server lifecycle logs.
+	Logger *log.Entry
 }
 
 // Server manages an HTTP server with graceful shutdown
@@ -78,14 +80,19 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Wrap with TLS if configured
+	logger := s.config.Logger
+	if logger == nil {
+		logger = log.WithField("component", "http-server")
+	}
+
 	if s.config.TLSConfig != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"server":  s.config.Name,
 			"address": listener.Addr().String(),
 		}).Info("Starting HTTPS server")
 		listener = tls.NewListener(listener, s.config.TLSConfig)
 	} else {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"server":  s.config.Name,
 			"address": listener.Addr().String(),
 		}).Info("Starting HTTP server")
@@ -105,7 +112,7 @@ func (s *Server) Start(ctx context.Context) error {
 		defer close(s.done)
 
 		if err := s.server.Serve(listener); err != nil && err != http.ErrServerClosed {
-			log.WithFields(log.Fields{
+			logger.WithFields(log.Fields{
 				"server": s.config.Name,
 				"error":  err,
 			}).Error("HTTP server error")
@@ -124,7 +131,12 @@ func (s *Server) Stop() error {
 		return nil
 	}
 
-	log.WithField("server", s.config.Name).Info("Stopping HTTP server")
+	logger := s.config.Logger
+	if logger == nil {
+		logger = log.WithField("component", "http-server")
+	}
+
+	logger.WithField("server", s.config.Name).Info("Stopping HTTP server")
 
 	// Cancel context
 	if s.cancel != nil {
@@ -136,7 +148,7 @@ func (s *Server) Stop() error {
 	defer cancel()
 
 	if err := s.server.Shutdown(ctx); err != nil {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"server": s.config.Name,
 			"error":  err,
 		}).Warn("Failed to shutdown HTTP server gracefully, forcing close")
@@ -159,7 +171,7 @@ func (s *Server) Stop() error {
 	s.cancel = nil
 	s.done = nil
 
-	log.WithField("server", s.config.Name).Info("HTTP server stopped")
+	logger.WithField("server", s.config.Name).Info("HTTP server stopped")
 
 	return nil
 }

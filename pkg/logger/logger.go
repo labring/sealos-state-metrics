@@ -1,7 +1,9 @@
 package logger
 
 import (
+	"context"
 	stdlog "log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +20,8 @@ type Options struct {
 
 // Option is a function that configures Options
 type Option func(*Options)
+
+type requestLoggerKey struct{}
 
 // WithDebug enables or disables debug mode
 func WithDebug(debug bool) Option {
@@ -40,9 +44,7 @@ func WithFormat(format string) Option {
 	}
 }
 
-// InitLog initializes the logger with the given options
-func InitLog(opts ...Option) {
-	// Default options
+func resolveOptions(opts ...Option) *Options {
 	options := &Options{
 		Debug:  false,
 		Level:  "info",
@@ -54,7 +56,13 @@ func InitLog(opts ...Option) {
 		opt(options)
 	}
 
-	l := log.StandardLogger()
+	return options
+}
+
+func configure(l *log.Logger, options *Options) {
+	if l == nil {
+		return
+	}
 
 	// Set log level based on configuration
 	level := strings.ToLower(options.Level)
@@ -100,6 +108,29 @@ func InitLog(opts ...Option) {
 	}
 }
 
+// New creates a configured logger instance.
+func New(opts ...Option) *log.Logger {
+	l := log.New()
+	configure(l, resolveOptions(opts...))
+	return l
+}
+
+// InitLog initializes the logger with the given options and keeps the global logger
+// aligned for legacy call sites.
+func InitLog(l *log.Logger, opts ...Option) *log.Logger {
+	options := resolveOptions(opts...)
+
+	if l == nil {
+		l = log.New()
+	}
+
+	configure(l, options)
+	configure(log.StandardLogger(), options)
+	stdlog.SetOutput(l.Writer())
+
+	return l
+}
+
 // WithComponent returns a logger with component field
 func WithComponent(component string) *log.Entry {
 	return log.WithField("component", component)
@@ -108,4 +139,42 @@ func WithComponent(component string) *log.Entry {
 // WithFields returns a logger with multiple fields
 func WithFields(fields log.Fields) *log.Entry {
 	return log.WithFields(fields)
+}
+
+// WithEntry stores the request logger in the context.
+func WithEntry(ctx context.Context, entry *log.Entry) context.Context {
+	if ctx == nil || entry == nil {
+		return ctx
+	}
+
+	return context.WithValue(ctx, requestLoggerKey{}, entry)
+}
+
+// WithRequestEntry returns a cloned request carrying the logger entry in context.
+func WithRequestEntry(req *http.Request, entry *log.Entry) *http.Request {
+	if req == nil || entry == nil {
+		return req
+	}
+
+	return req.WithContext(WithEntry(req.Context(), entry))
+}
+
+// EntryFromContext returns a request-scoped logger entry if present.
+func EntryFromContext(ctx context.Context) (*log.Entry, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+
+	entry, ok := ctx.Value(requestLoggerKey{}).(*log.Entry)
+
+	return entry, ok
+}
+
+// EntryFromRequest returns a request-scoped logger entry if present.
+func EntryFromRequest(req *http.Request) (*log.Entry, bool) {
+	if req == nil {
+		return nil, false
+	}
+
+	return EntryFromContext(req.Context())
 }

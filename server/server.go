@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/httpserver"
@@ -31,6 +32,7 @@ type Server struct {
 	promRegistry   *prometheus.Registry
 	leaderElector  *leaderelection.LeaderElector
 	clientProvider collector.ClientProvider // Shared client provider for lazy initialization
+	logger         *log.Entry
 
 	// Fields needed for reinitialization
 	mu sync.RWMutex // Protects reload operations; readers (Collect) use RLock, writers (Reload) use Lock
@@ -44,12 +46,19 @@ type Server struct {
 }
 
 // New creates a new server instance
-func New(cfg *config.GlobalConfig, configContent []byte) *Server {
+func New(cfg *config.GlobalConfig, configContent []byte, logger *log.Entry) *Server {
+	if logger == nil {
+		logger = log.WithField("component", "server")
+	} else {
+		logger = logger.WithField("component", "server")
+	}
+
 	return &Server{
 		config:        cfg,
 		configContent: configContent,
 		registry:      registry.GetRegistry(),
 		promRegistry:  prometheus.NewRegistry(),
+		logger:        logger,
 	}
 }
 
@@ -75,7 +84,7 @@ func (s *Server) Init(ctx context.Context) error {
 			QPS:        s.config.Kubernetes.QPS,
 			Burst:      s.config.Kubernetes.Burst,
 		},
-		log.WithField("component", "client-provider"),
+		s.logger.WithField("subcomponent", "client-provider"),
 	)
 
 	// Initialize collectors with lazy client loading
@@ -119,7 +128,7 @@ func (s *Server) Serve() error {
 			MinVersion:     tls.VersionTLS12,
 		}
 
-		log.WithFields(log.Fields{
+		s.logger.WithFields(log.Fields{
 			"certFile": s.config.Server.TLS.CertFile,
 			"keyFile":  s.config.Server.TLS.KeyFile,
 		}).Info("TLS enabled with certificate auto-reload via fsnotify")
@@ -137,6 +146,7 @@ func (s *Server) Serve() error {
 		Handler:   mainHandler,
 		TLSConfig: tlsConfig,
 		Name:      "main",
+		Logger:    s.logger.WithField("server", "main"),
 	})
 
 	if err := s.mainServer.Start(s.serverCtx); err != nil {
@@ -154,6 +164,7 @@ func (s *Server) Serve() error {
 			Address: fmt.Sprintf("127.0.0.1:%d", s.config.DebugServer.Port),
 			Handler: debugHandler,
 			Name:    "debug",
+			Logger:  s.logger.WithField("server", "debug"),
 		})
 
 		if err := s.debugServer.Start(s.serverCtx); err != nil {
@@ -163,34 +174,34 @@ func (s *Server) Serve() error {
 
 	// Wait for context cancellation
 	<-s.serverCtx.Done()
-	log.Info("Context cancelled, shutting down")
+	s.logger.Info("Context cancelled, shutting down")
 
 	return s.Shutdown()
 }
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown() error {
-	log.Info("Shutting down server")
+	s.logger.Info("Shutting down server")
 
 	// 1. Shutdown HTTP servers
 	if s.mainServer != nil {
 		if err := s.mainServer.Stop(); err != nil {
-			log.WithError(err).Error("Failed to shutdown main HTTP server")
+			s.logger.WithError(err).Error("Failed to shutdown main HTTP server")
 		}
 	}
 
 	if s.debugServer != nil {
 		if err := s.debugServer.Stop(); err != nil {
-			log.WithError(err).Error("Failed to shutdown debug HTTP server")
+			s.logger.WithError(err).Error("Failed to shutdown debug HTTP server")
 		}
 	}
 
 	// 2. Stop all collectors
 	if err := s.stopCollectors(); err != nil {
-		log.WithError(err).Error("Failed to stop collectors")
+		s.logger.WithError(err).Error("Failed to stop collectors")
 	}
 
-	log.Info("Server shutdown complete")
+	s.logger.Info("Server shutdown complete")
 
 	return nil
 }
@@ -237,30 +248,39 @@ func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
 
 // createMainHandler creates the HTTP handler for main server (with optional auth)
 func (s *Server) createMainHandler() (http.Handler, error) {
-	mux := http.NewServeMux()
-	if err := s.setupRoutes(
-		mux,
+	return s.createRouter(
+		"main",
 		s.config.Server.MetricsPath,
 		s.config.Server.HealthPath,
 		s.config.Server.Auth.Enabled,
-	); err != nil {
-		return nil, err
-	}
-
-	return mux, nil
+	)
 }
 
 // createDebugHandler creates HTTP handler for debug server (no auth)
 func (s *Server) createDebugHandler() (http.Handler, error) {
-	mux := http.NewServeMux()
-	if err := s.setupRoutes(
-		mux,
+	return s.createRouter(
+		"debug",
 		s.config.DebugServer.MetricsPath,
 		s.config.DebugServer.HealthPath,
 		false,
-	); err != nil {
+	)
+}
+
+func (s *Server) createRouter(
+	serverName, metricsPath, healthPath string,
+	enableAuth bool,
+) (*gin.Engine, error) {
+	if s.config.Logging.Debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	engine := gin.New()
+
+	if err := s.setupRoutes(engine, serverName, metricsPath, healthPath, enableAuth); err != nil {
 		return nil, err
 	}
 
-	return mux, nil
+	return engine, nil
 }

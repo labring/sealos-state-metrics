@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/labring/sealos-state-metrics/pkg/leaderelection"
-	log "github.com/sirupsen/logrus"
 )
 
 // setupLeaderElection creates and starts the leader elector
@@ -19,7 +18,7 @@ func (s *Server) setupLeaderElection() error {
 	elector, err := leaderelection.NewLeaderElector(
 		s.buildLeaderElectionConfig(),
 		client,
-		log.WithField("component", "leader-election"),
+		s.logger.WithField("subcomponent", "leader-election"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create leader elector: %w", err)
@@ -27,21 +26,21 @@ func (s *Server) setupLeaderElection() error {
 
 	elector.SetCallbacks(
 		func(ctx context.Context) {
-			log.Info("Became leader, starting leader-required collectors")
+			s.logger.Info("Became leader, starting leader-required collectors")
 
 			if err := s.registry.StartLeaderCollectors(ctx); err != nil {
-				log.WithError(err).Error("Failed to start leader-required collectors")
+				s.logger.WithError(err).Error("Failed to start leader-required collectors")
 			}
 		},
 		func() {
-			log.Info("Lost leadership, stopping leader-required collectors")
+			s.logger.Info("Lost leadership, stopping leader-required collectors")
 
 			if err := s.registry.StopLeaderCollectors(); err != nil {
-				log.WithError(err).Error("Failed to stop leader-required collectors")
+				s.logger.WithError(err).Error("Failed to stop leader-required collectors")
 			}
 		},
 		func(identity string) {
-			log.WithField("leader", identity).Info("New leader elected")
+			s.logger.WithField("leader", identity).Info("New leader elected")
 		},
 	)
 
@@ -57,13 +56,13 @@ func (s *Server) setupLeaderElection() error {
 	go func() {
 		defer close(s.leDoneCh)
 
-		log.Info("Starting leader election")
+		s.logger.Info("Starting leader election")
 
 		if err := elector.Run(leCtx); err != nil {
-			log.WithError(err).Error("Leader election exited with error")
+			s.logger.WithError(err).Error("Leader election exited with error")
 		}
 
-		log.Info("Leader election stopped")
+		s.logger.Info("Leader election stopped")
 	}()
 
 	return nil
@@ -78,7 +77,7 @@ func (s *Server) stopLeaderElection() {
 	leDoneCh := s.leDoneCh
 
 	if leCtxCancel != nil {
-		log.Info("Stopping leader election and releasing lease")
+		s.logger.Info("Stopping leader election and releasing lease")
 		leCtxCancel()
 
 		// Wait for leader election goroutine to exit
