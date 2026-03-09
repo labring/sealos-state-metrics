@@ -11,7 +11,7 @@ import (
 
 // RedisConnectionInfo holds Redis connection information
 type RedisConnectionInfo struct {
-	Password string
+	password string
 	Host     string
 	Port     string
 	Endpoint string
@@ -83,7 +83,7 @@ func (c *Collector) parseRedisConnectionInfo(
 	fullEndpoint := c.buildFullEndpoint(host, port, namespace)
 
 	return &RedisConnectionInfo{
-		Password: password,
+		password: password,
 		Host:     host,
 		Port:     port,
 		Endpoint: fullEndpoint,
@@ -98,7 +98,7 @@ func (c *Collector) openRedisConnection(connInfo *RedisConnectionInfo) (*redis.C
 	// Create Redis client
 	client := redis.NewClient(&redis.Options{
 		Addr:         connInfo.Address,
-		Password:     connInfo.Password,
+		Password:     connInfo.password,
 		DB:           0,
 		DialTimeout:  c.config.CheckTimeout,
 		ReadTimeout:  c.config.CheckTimeout,

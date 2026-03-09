@@ -13,7 +13,7 @@ import (
 // PostgreSQLConnectionInfo holds PostgreSQL connection information
 type PostgreSQLConnectionInfo struct {
 	Username string
-	Password string
+	password string
 	Host     string
 	Port     string
 	Endpoint string
@@ -122,7 +122,7 @@ func (c *Collector) parsePostgreSQLConnectionInfo(
 
 	return &PostgreSQLConnectionInfo{
 		Username: username,
-		Password: password,
+		password: password,
 		Host:     host,
 		Port:     port,
 		Endpoint: fullEndpoint,
@@ -195,7 +195,7 @@ func (c *Collector) reconnectToPostgreSQLDatabase(
 	// Build DSN with database name
 	dsnWithDB := fmt.Sprintf("postgresql://%s:%s@%s/%s?sslmode=disable&connect_timeout=%d",
 		connInfo.Username,
-		connInfo.Password,
+		connInfo.password,
 		connInfo.Endpoint,
 		dbName,
 		int(c.config.CheckTimeout.Seconds()),

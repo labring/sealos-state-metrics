@@ -12,10 +12,10 @@ type Config struct {
 
 	// Concurrency settings for database connection checks
 	// Controls maximum concurrent connections per database type
-	MySQLConcurrency      int `yaml:"mysqlConcurrency" json:"mysql_concurrency" env:"MYSQL_CONCURRENCY"`
+	MySQLConcurrency      int `yaml:"mysqlConcurrency"      json:"mysql_concurrency"      env:"MYSQL_CONCURRENCY"`
 	PostgreSQLConcurrency int `yaml:"postgresqlConcurrency" json:"postgresql_concurrency" env:"POSTGRESQL_CONCURRENCY"`
-	MongoDBConcurrency    int `yaml:"mongodbConcurrency" json:"mongodb_concurrency" env:"MONGODB_CONCURRENCY"`
-	RedisConcurrency      int `yaml:"redisConcurrency" json:"redis_concurrency" env:"REDIS_CONCURRENCY"`
+	MongoDBConcurrency    int `yaml:"mongodbConcurrency"    json:"mongodb_concurrency"    env:"MONGODB_CONCURRENCY"`
+	RedisConcurrency      int `yaml:"redisConcurrency"      json:"redis_concurrency"      env:"REDIS_CONCURRENCY"`
 }
 
 // NewDefaultConfig returns the default configuration

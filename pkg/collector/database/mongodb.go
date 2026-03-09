@@ -14,7 +14,7 @@ import (
 // MongoDBConnectionInfo holds MongoDB connection information
 type MongoDBConnectionInfo struct {
 	Username string
-	Password string
+	password string
 	Host     string
 	Port     string
 	Endpoint string
@@ -40,6 +40,7 @@ func (c *Collector) checkMongoDBConnectivity(
 	if err != nil {
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
+
 	defer func() {
 		if err := client.Disconnect(ctx); err != nil {
 			c.logger.WithError(err).Warn("Failed to disconnect from MongoDB")
@@ -108,7 +109,7 @@ func (c *Collector) parseMongoDBConnectionInfo(
 
 	return &MongoDBConnectionInfo{
 		Username: username,
-		Password: password,
+		password: password,
 		Host:     host,
 		Port:     port,
 		Endpoint: fullEndpoint,

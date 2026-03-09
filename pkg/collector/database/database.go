@@ -134,10 +134,12 @@ func (c *Collector) pollLoop(ctx context.Context) {
 
 	// Start secret cache
 	if err := c.secretCache.Start(ctx, c.config.Namespaces); err != nil {
-		c.logger.WithError(err).Error("Failed to start secret cache, falling back to direct queries")
+		c.logger.WithError(err).
+			Error("Failed to start secret cache, falling back to direct queries")
 		c.secretCache = nil // Disable cache on error
 	} else {
-		c.logger.WithField("cache_size", c.secretCache.GetCacheSize()).Info("Secret cache started successfully")
+		c.logger.WithField("cache_size", c.secretCache.GetCacheSize()).
+			Info("Secret cache started successfully")
 	}
 
 	// Initial poll
@@ -155,9 +157,11 @@ func (c *Collector) pollLoop(ctx context.Context) {
 			}
 		case <-ctx.Done():
 			c.logger.Info("Context cancelled, stopping database poll loop")
+
 			if c.secretCache != nil {
 				c.secretCache.Stop()
 			}
+
 			return
 		}
 	}
@@ -168,10 +172,7 @@ func (c *Collector) Poll(ctx context.Context) error {
 	c.logger.Debug("Starting database connectivity checks")
 
 	// Collect all database tasks
-	tasks, err := c.collectDatabaseTasks(ctx)
-	if err != nil {
-		return err
-	}
+	tasks := c.collectDatabaseTasks(ctx)
 
 	c.logger.WithField("total_tasks", len(tasks)).Debug("Collected database tasks")
 
@@ -199,35 +200,27 @@ func (c *Collector) Poll(ctx context.Context) error {
 }
 
 // collectDatabaseTasks collects all database connection tasks across namespaces
-func (c *Collector) collectDatabaseTasks(ctx context.Context) ([]DatabaseTask, error) {
+func (c *Collector) collectDatabaseTasks(ctx context.Context) []DatabaseTask {
 	var tasks []DatabaseTask
 
 	// Check if we need to scan all namespaces or specific ones
 	if len(c.config.Namespaces) == 0 {
 		// Scan all namespaces: fetch all secrets at once for better performance
-		allTasks, err := c.collectAllNamespaceTasks(ctx)
-		if err != nil {
-			return nil, err
-		}
+		allTasks := c.collectAllNamespaceTasks(ctx)
 		tasks = append(tasks, allTasks...)
 	} else {
 		// Scan specific namespaces
 		for _, ns := range c.config.Namespaces {
-			nsTasks, err := c.collectNamespaceTasks(ctx, ns)
-			if err != nil {
-				c.logger.WithError(err).WithField("namespace", ns).
-					Error("Failed to collect tasks from namespace")
-				continue
-			}
+			nsTasks := c.collectNamespaceTasks(ctx, ns)
 			tasks = append(tasks, nsTasks...)
 		}
 	}
 
-	return tasks, nil
+	return tasks
 }
 
 // collectAllNamespaceTasks collects tasks from all namespaces efficiently
-func (c *Collector) collectAllNamespaceTasks(ctx context.Context) ([]DatabaseTask, error) {
+func (c *Collector) collectAllNamespaceTasks(ctx context.Context) []DatabaseTask {
 	var tasks []DatabaseTask
 
 	// Define all database types
@@ -241,6 +234,7 @@ func (c *Collector) collectAllNamespaceTasks(ctx context.Context) ([]DatabaseTas
 	// Use cache if available
 	if c.secretCache != nil {
 		c.logger.Debug("Using secret cache to collect tasks")
+
 		for _, dbType := range dbTypes {
 			secrets := c.secretCache.GetSecrets(dbType, c.isCredentialSecret)
 
@@ -259,7 +253,8 @@ func (c *Collector) collectAllNamespaceTasks(ctx context.Context) ([]DatabaseTas
 				})
 			}
 		}
-		return tasks, nil
+
+		return tasks
 	}
 
 	// Fallback to direct API calls if cache is not available
@@ -309,11 +304,14 @@ func (c *Collector) collectAllNamespaceTasks(ctx context.Context) ([]DatabaseTas
 		}
 	}
 
-	return tasks, nil
+	return tasks
 }
 
 // collectNamespaceTasks collects tasks from a specific namespace
-func (c *Collector) collectNamespaceTasks(ctx context.Context, namespace string) ([]DatabaseTask, error) {
+func (c *Collector) collectNamespaceTasks(
+	ctx context.Context,
+	namespace string,
+) []DatabaseTask {
 	var tasks []DatabaseTask
 
 	dbTypeSelectors := map[DatabaseType]string{
@@ -332,6 +330,7 @@ func (c *Collector) collectNamespaceTasks(ctx context.Context, namespace string)
 				"namespace": namespace,
 				"type":      dbType,
 			}).Error("Failed to list secrets")
+
 			continue
 		}
 
@@ -353,11 +352,14 @@ func (c *Collector) collectNamespaceTasks(ctx context.Context, namespace string)
 		}
 	}
 
-	return tasks, nil
+	return tasks
 }
 
 // processDatabaseTasksConcurrently processes database tasks with controlled concurrency per type
-func (c *Collector) processDatabaseTasksConcurrently(ctx context.Context, tasks []DatabaseTask) map[string]*DatabaseStatus {
+func (c *Collector) processDatabaseTasksConcurrently(
+	ctx context.Context,
+	tasks []DatabaseTask,
+) map[string]*DatabaseStatus {
 	// Group tasks by database type
 	tasksByType := make(map[DatabaseType][]DatabaseTask)
 	for _, task := range tasks {
@@ -366,12 +368,15 @@ func (c *Collector) processDatabaseTasksConcurrently(ctx context.Context, tasks 
 
 	// Process each type concurrently with type-specific concurrency limits
 	var wg sync.WaitGroup
+
 	statusChan := make(chan *DatabaseStatus, len(tasks))
 
 	for dbType, typeTasks := range tasksByType {
 		wg.Add(1)
+
 		go func(dt DatabaseType, tt []DatabaseTask) {
 			defer wg.Done()
+
 			c.processTasksWithConcurrency(ctx, dt, tt, statusChan)
 		}(dbType, typeTasks)
 	}
@@ -404,6 +409,7 @@ func (c *Collector) processTasksWithConcurrency(
 
 	// Create semaphore for concurrency control
 	sem := make(chan struct{}, concurrency)
+
 	var wg sync.WaitGroup
 
 	for _, task := range tasks {
@@ -414,6 +420,7 @@ func (c *Collector) processTasksWithConcurrency(
 		}
 
 		wg.Add(1)
+
 		go func(t DatabaseTask) {
 			defer wg.Done()
 
@@ -422,7 +429,13 @@ func (c *Collector) processTasksWithConcurrency(
 			defer func() { <-sem }()
 
 			// Check database connectivity
-			status := c.checkDatabaseConnectivity(ctx, t.Namespace, t.DatabaseName, t.DatabaseType, t.Secret)
+			status := c.checkDatabaseConnectivity(
+				ctx,
+				t.Namespace,
+				t.DatabaseName,
+				t.DatabaseType,
+				t.Secret,
+			)
 
 			if status.Connected {
 				c.logger.WithFields(log.Fields{
@@ -548,7 +561,13 @@ func (c *Collector) checkDatabaseConnectivity(
 
 	// Preflight checks (fast-fail)
 	if c.preflightChecker != nil {
-		if preflightErr := c.preflightChecker.CheckDatabase(ctx, namespace, dbName, dbType, secret); preflightErr != nil {
+		if preflightErr := c.preflightChecker.CheckDatabase(
+			ctx,
+			namespace,
+			dbName,
+			dbType,
+			secret,
+		); preflightErr != nil {
 			status.ResponseTime = time.Since(startTime).Seconds()
 			status.Connected = false
 			status.Error = preflightErr.Error()
@@ -558,6 +577,7 @@ func (c *Collector) checkDatabaseConnectivity(
 				"type":      dbType,
 				"error":     preflightErr.Type,
 			}).Debug("Database preflight check failed (fast-fail)")
+
 			return status
 		}
 	}
@@ -701,12 +721,14 @@ func (c *Collector) calculateTypeStatistics() map[DatabaseType]struct {
 
 	for _, status := range c.dbConnectivity {
 		stats := typeStats[status.DatabaseType]
+
 		stats.total++
 		if status.Connected {
 			stats.available++
 		} else {
 			stats.unavailable++
 		}
+
 		typeStats[status.DatabaseType] = stats
 	}
 
