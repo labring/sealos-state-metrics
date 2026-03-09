@@ -40,6 +40,7 @@ func (c *Collector) checkMongoDBConnectivity(
 	if err != nil {
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
+
 	defer func() {
 		if err := client.Disconnect(ctx); err != nil {
 			c.logger.WithError(err).Warn("Failed to disconnect from MongoDB")

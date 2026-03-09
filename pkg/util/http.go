@@ -51,7 +51,6 @@ func CheckHTTP(ctx context.Context, url string, timeout time.Duration) *HTTPChec
 		}
 	}
 
-	//nolint:gosec // validated monitoring target; outbound HTTP checks are intentional collector behavior
 	resp, err := client.Do(req)
 	responseTime := time.Since(start)
 
@@ -125,7 +124,6 @@ func CheckHTTPWithIP(
 	// Preserve the configured authority for Host routing.
 	req.Host = formatHTTPSAuthority(host, port)
 
-	//nolint:gosec // validated monitoring target; outbound HTTP checks are intentional collector behavior
 	resp, err := client.Do(req)
 	responseTime := time.Since(start)
 
