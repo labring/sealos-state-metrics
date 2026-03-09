@@ -33,13 +33,15 @@ func main() {
 	}
 
 	// Initialize logger
-	logger.InitLog(
+	appLogger := logger.InitLog(
+		nil,
 		logger.WithDebug(cfg.Logging.Debug),
 		logger.WithLevel(cfg.Logging.Level),
 		logger.WithFormat(cfg.Logging.Format),
 	)
+	appLog := log.NewEntry(appLogger)
 
-	log.WithFields(log.Fields{
+	appLog.WithFields(log.Fields{
 		"collectors":     cfg.EnabledCollectors,
 		"leaderElection": cfg.LeaderElection.Enabled,
 		"metricsAddress": cfg.Server.Address,
@@ -55,7 +57,7 @@ func main() {
 	}
 
 	// Create server
-	srv := server.New(cfg, configContent)
+	srv := server.New(cfg, configContent, appLog)
 
 	// Create pprof server
 	var pprofServer *pprof.Server
@@ -67,7 +69,7 @@ func main() {
 	var reloader *config.Reloader
 	if cfg.ConfigPath != "" {
 		reloader, err = config.NewReloader(cfg.ConfigPath, func(newConfigContent []byte) error {
-			return handleReload(cliArgs, newConfigContent, srv, pprofServer)
+			return handleReload(cliArgs, newConfigContent, appLogger, srv, pprofServer)
 		})
 		if err != nil {
 			log.WithError(err).Fatal("Failed to create config reloader")
@@ -106,21 +108,22 @@ func main() {
 			}
 		}()
 
-		log.WithField("config_path", cfg.ConfigPath).Info("Configuration hot reload enabled")
+		appLog.WithField("config_path", cfg.ConfigPath).Info("Configuration hot reload enabled")
 	}
 
 	// Start HTTP server and wait (blocks until context is cancelled or error)
 	if err := srv.Serve(); err != nil {
-		log.WithError(err).Fatal("Server exited with error")
+		appLog.WithError(err).Fatal("Server exited with error")
 	}
 
-	log.Info("Server exited successfully")
+	appLog.Info("Server exited successfully")
 }
 
 // handleReload handles configuration reload for logger, server and pprof
 func handleReload(
 	cliArgs []string,
 	newConfigContent []byte,
+	appLogger *log.Logger,
 	srv *server.Server,
 	pprofServer *pprof.Server,
 ) error {
@@ -131,7 +134,7 @@ func handleReload(
 	}
 
 	// Reload logger
-	reloadLogger(newConfig)
+	reloadLogger(appLogger, newConfig)
 
 	// Reload pprof server
 	reloadPprofServer(pprofServer, newConfig)
@@ -159,14 +162,15 @@ func loadAndValidateConfig(cliArgs []string, configContent []byte) (*config.Glob
 }
 
 // reloadLogger reloads logger configuration
-func reloadLogger(cfg *config.GlobalConfig) {
+func reloadLogger(appLogger *log.Logger, cfg *config.GlobalConfig) {
 	logger.InitLog(
+		appLogger,
 		logger.WithDebug(cfg.Logging.Debug),
 		logger.WithLevel(cfg.Logging.Level),
 		logger.WithFormat(cfg.Logging.Format),
 	)
 
-	log.Info("Logger reloaded")
+	log.NewEntry(appLogger).Info("Logger reloaded")
 }
 
 // reloadPprofServer reloads pprof server based on new configuration

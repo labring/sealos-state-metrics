@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	applogger "github.com/labring/sealos-state-metrics/pkg/logger"
 	log "github.com/sirupsen/logrus"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -25,6 +26,7 @@ type Authenticator struct {
 	authCache    *authCache
 	authzCache   *authzCache
 	retryBackoff wait.Backoff
+	logger       *log.Entry
 }
 
 // authCache caches TokenReview results
@@ -50,7 +52,11 @@ type authzCacheEntry struct {
 }
 
 // NewAuthenticator creates a new authenticator with caching
-func NewAuthenticator(client kubernetes.Interface) *Authenticator {
+func NewAuthenticator(client kubernetes.Interface, logger *log.Entry) *Authenticator {
+	if logger == nil {
+		logger = log.WithField("component", "auth")
+	}
+
 	a := &Authenticator{
 		client: client,
 		authCache: &authCache{
@@ -66,6 +72,7 @@ func NewAuthenticator(client kubernetes.Interface) *Authenticator {
 			Jitter:   0.2,
 			Steps:    5,
 		},
+		logger: logger,
 	}
 
 	// Start cache cleanup goroutine
@@ -110,10 +117,15 @@ func (a *Authenticator) cleanupExpiredEntries() {
 // and authorizes them using SubjectAccessReview
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqLogger := a.logger
+		if entry, ok := applogger.EntryFromRequest(r); ok {
+			reqLogger = entry
+		}
+
 		// Extract bearer token from Authorization header
 		token := extractBearerToken(r)
 		if token == "" {
-			log.Debug("No bearer token found in request")
+			reqLogger.Debug("No bearer token found in request")
 			http.Error(w, "Unauthorized: no bearer token provided", http.StatusUnauthorized)
 			return
 		}
@@ -121,7 +133,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		// Authenticate the token using TokenReview (with caching)
 		userInfo, err := a.authenticateTokenCached(r.Context(), token)
 		if err != nil {
-			log.WithError(err).Warn("Token authentication failed")
+			reqLogger.WithError(err).Warn("Token authentication failed")
 			http.Error(w, fmt.Sprintf("Unauthorized: %v", err), http.StatusUnauthorized)
 			return
 		}
@@ -129,14 +141,14 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		// Authorize the request using SubjectAccessReview (with caching)
 		allowed, err := a.authorizeRequestCached(r.Context(), userInfo, r.URL.Path, r.Method)
 		if err != nil {
-			log.WithError(err).Error("Authorization check failed")
+			reqLogger.WithError(err).Error("Authorization check failed")
 			http.Error(w, fmt.Sprintf("Internal error: %v", err), http.StatusInternalServerError)
 
 			return
 		}
 
 		if !allowed {
-			log.WithFields(log.Fields{
+			reqLogger.WithFields(log.Fields{
 				"user":   userInfo.Username,
 				"path":   r.URL.Path,
 				"method": r.Method,
@@ -146,7 +158,7 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		log.WithFields(log.Fields{
+		reqLogger.WithFields(log.Fields{
 			"user": userInfo.Username,
 			"path": r.URL.Path,
 		}).Debug("Request authenticated and authorized")
@@ -185,7 +197,7 @@ func (a *Authenticator) authenticateTokenCached(
 	if entry, ok := a.authCache.cache[cacheKey]; ok {
 		if time.Now().Before(entry.expiresAt) {
 			a.authCache.mu.RUnlock()
-			log.Debug("Authentication cache hit")
+			a.logger.Debug("Authentication cache hit")
 			return entry.userInfo, nil
 		}
 	}
@@ -239,7 +251,7 @@ func (a *Authenticator) authenticateToken(
 			)
 			if err != nil {
 				lastErr = err
-				log.WithError(err).Debug("TokenReview API call failed, retrying...")
+				a.logger.WithError(err).Debug("TokenReview API call failed, retrying...")
 				return false, nil // Retry
 			}
 
@@ -283,7 +295,7 @@ func (a *Authenticator) authorizeRequestCached(
 			allowed := entry.allowed
 
 			a.authzCache.mu.RUnlock()
-			log.WithField("allowed", allowed).Debug("Authorization cache hit")
+			a.logger.WithField("allowed", allowed).Debug("Authorization cache hit")
 
 			return allowed, nil
 		}
@@ -353,7 +365,7 @@ func (a *Authenticator) authorizeRequest(
 			)
 			if err != nil {
 				lastErr = err
-				log.WithError(err).Debug("SubjectAccessReview API call failed, retrying...")
+				a.logger.WithError(err).Debug("SubjectAccessReview API call failed, retrying...")
 				return false, nil // Retry
 			}
 

@@ -1,102 +1,40 @@
 package server
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 
-	"github.com/labring/sealos-state-metrics/pkg/auth"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
+	"github.com/gin-gonic/gin"
 )
 
-// setupRoutes configures HTTP routes with optional authentication
-func (s *Server) setupRoutes(
-	mux *http.ServeMux,
-	metricsPath, healthPath string,
-	enableAuth bool,
-) error {
-	// Metrics endpoint with optional authentication
-	metricsHandler := promhttp.HandlerFor(
-		s.promRegistry,
-		promhttp.HandlerOpts{
-			EnableOpenMetrics: true,
-		},
-	)
-
-	// Apply authentication middleware if enabled
-	if enableAuth {
-		// Get Kubernetes client for authentication
-		client, err := s.getKubernetesClient()
-		if err != nil {
-			return fmt.Errorf("failed to get Kubernetes client for authentication: %w", err)
-		}
-
-		authenticator := auth.NewAuthenticator(client)
-		metricsHandler = authenticator.Middleware(metricsHandler)
-
-		log.Info("Kubernetes authentication enabled for metrics endpoint")
-	}
-
-	mux.Handle(metricsPath, metricsHandler)
-
-	// Health endpoint (no authentication)
-	mux.HandleFunc(healthPath, s.handleHealth)
-
-	// Collectors list endpoint (no authentication)
-	mux.HandleFunc("/collectors", s.handleCollectors)
-
-	// Leader election endpoint (no authentication)
-	mux.HandleFunc("/leader", s.handleLeader)
-
-	// Root endpoint (no authentication)
-	mux.HandleFunc("/", s.handleRoot)
-
-	return nil
-}
-
-// handleHealth handles health check requests
-func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	// Get all collectors
+// handleHealth handles health check requests.
+func (s *Server) handleHealth(c *gin.Context) {
 	allCollectors := s.registry.GetAllCollectors()
 	failedCollectors := s.registry.GetFailedCollectors()
-
-	// Determine which collectors should be checked based on leader election state
 	healthStatus := make(map[string]string)
 	allHealthy := true
 
-	// Leader-required collector: only check if we are the leader
 	s.leMu.Lock()
 	isLeader := s.leaderElector != nil && s.leaderElector.IsLeader()
 	s.leMu.Unlock()
 
-	for name, c := range allCollectors {
-		// Determine if this collector should be checked
+	for name, collector := range allCollectors {
 		var shouldCheck bool
-
 		if !s.config.LeaderElection.Enabled {
-			// Leader election disabled: all collectors should be running
 			shouldCheck = true
+		} else if collector.RequiresLeaderElection() {
+			shouldCheck = isLeader
 		} else {
-			// Leader election enabled
-			if c.RequiresLeaderElection() {
-				shouldCheck = isLeader
-			} else {
-				// Non-leader collector: always check (should always be running)
-				shouldCheck = true
-			}
+			shouldCheck = true
 		}
 
 		if shouldCheck {
-			err := c.Health()
-			if err != nil {
+			if err := collector.Health(); err != nil {
 				healthStatus[name] = err.Error()
 				allHealthy = false
 			}
 		}
 	}
 
-	// Add failed collectors to health status
 	for name, err := range failedCollectors {
 		healthStatus[name] = err.Error()
 		allHealthy = false
@@ -107,24 +45,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		status = http.StatusServiceUnavailable
 	}
 
-	writeJSON(w, status, map[string]any{
+	c.JSON(status, gin.H{
 		"status":    allHealthy,
 		"unhealthy": healthStatus,
 	})
 }
 
-// handleCollectors handles collector list requests
-func (s *Server) handleCollectors(w http.ResponseWriter, _ *http.Request) {
+// handleCollectors handles collector list requests.
+func (s *Server) handleCollectors(c *gin.Context) {
 	collectors := s.registry.ListCollectors()
-	writeJSON(w, http.StatusOK, map[string]any{
+	c.JSON(http.StatusOK, gin.H{
 		"collectors": collectors,
 		"count":      len(collectors),
 	})
 }
 
-// handleLeader handles leader election status requests
-func (s *Server) handleLeader(w http.ResponseWriter, _ *http.Request) {
-	response := map[string]any{
+// handleLeader handles leader election status requests.
+func (s *Server) handleLeader(c *gin.Context) {
+	response := gin.H{
 		"enabled": s.config.LeaderElection.Enabled,
 	}
 
@@ -137,18 +75,19 @@ func (s *Server) handleLeader(w http.ResponseWriter, _ *http.Request) {
 		response["message"] = "Leader election disabled"
 	}
 
-	writeJSON(w, http.StatusOK, response)
+	c.JSON(http.StatusOK, response)
 }
 
-// handleRoot handles root requests
-func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
+// handleRoot handles root requests.
+func (s *Server) handleRoot(metricsPath, healthPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.URL.Path != "/" {
+			c.Status(http.StatusNotFound)
+			return
+		}
 
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, `
 <!DOCTYPE html>
 <html>
 <head>
@@ -171,15 +110,6 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	</div>
 </body>
 </html>
-`, s.config.Server.MetricsPath, s.config.Server.HealthPath)
-}
-
-// writeJSON writes a JSON response with the given status code
-func writeJSON(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.WithError(err).Error("Failed to encode JSON response")
+`, metricsPath, healthPath)
 	}
 }

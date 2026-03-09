@@ -2,20 +2,18 @@ package server
 
 import (
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // startCollectors starts collectors with or without leader election
 func (s *Server) startCollectors() error {
 	if !s.config.LeaderElection.Enabled {
-		log.Info("Leader election disabled, starting all collectors")
+		s.logger.Info("Leader election disabled, starting all collectors")
 		return s.registry.Start(s.serverCtx)
 	}
 
 	// Start non-leader collectors immediately
 	if err := s.registry.StartNonLeaderCollectors(s.serverCtx); err != nil {
-		log.WithError(err).Warn("Some non-leader collectors failed to start")
+		s.logger.WithError(err).Warn("Some non-leader collectors failed to start")
 	}
 
 	// Setup leader election
@@ -24,7 +22,7 @@ func (s *Server) startCollectors() error {
 
 // stopCollectors stops all collectors based on current leader election configuration
 func (s *Server) stopCollectors() error {
-	logger := log.WithField("component", "server")
+	logger := s.logger
 
 	if s.config.LeaderElection.Enabled {
 		// Current state: leader election is enabled

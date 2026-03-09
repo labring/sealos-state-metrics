@@ -7,7 +7,6 @@ import (
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/httpserver"
-	log "github.com/sirupsen/logrus"
 )
 
 // Reload reloads the server with new configuration.
@@ -17,7 +16,7 @@ func (s *Server) Reload(newConfigContent []byte, newConfig *config.GlobalConfig)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	logger := log.WithField("component", "config-reload")
+	logger := s.logger.WithField("subcomponent", "config-reload")
 	logger.Info("Starting server reload")
 
 	if s.serverCtx == nil {
@@ -67,7 +66,7 @@ func (s *Server) Reload(newConfigContent []byte, newConfig *config.GlobalConfig)
 				QPS:        s.config.Kubernetes.QPS,
 				Burst:      s.config.Kubernetes.Burst,
 			},
-			log.WithField("component", "client-provider"),
+			s.logger.WithField("subcomponent", "client-provider"),
 		)
 	}
 
@@ -88,7 +87,7 @@ func (s *Server) reloadDebugServer() error {
 	// Stop existing debug server if running
 	if s.debugServer != nil {
 		if err := s.debugServer.Stop(); err != nil {
-			log.WithError(err).Warn("Failed to stop debug server during reload")
+			s.logger.WithError(err).Warn("Failed to stop debug server during reload")
 		}
 
 		s.debugServer = nil
@@ -105,15 +104,16 @@ func (s *Server) reloadDebugServer() error {
 			Address: fmt.Sprintf("127.0.0.1:%d", s.config.DebugServer.Port),
 			Handler: debugHandler,
 			Name:    "debug",
+			Logger:  s.logger.WithField("server", "debug"),
 		})
 
 		if err := s.debugServer.Start(s.serverCtx); err != nil {
 			return fmt.Errorf("failed to start debug server: %w", err)
 		}
 
-		log.Info("Debug server reloaded successfully")
+		s.logger.Info("Debug server reloaded successfully")
 	} else {
-		log.Info("Debug server disabled")
+		s.logger.Info("Debug server disabled")
 	}
 
 	return nil
