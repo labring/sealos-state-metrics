@@ -70,12 +70,6 @@ func cachedLoggerNeedColor(l *log.Logger) func() bool {
 
 	return func() bool {
 		formatter := l.Formatter
-		// if cachedFormatter.CompareAndSwap(&oldFormatter, &formatter) {
-		// 	oldFormatter = formatter
-		// 	color := loggerNeedColor(formatter)
-		// 	needColor.Store(color)
-		// 	return color
-		// }
 
 		if cachedFormatter.Load() != &formatter {
 			cachedFormatter.Store(&formatter)

@@ -19,11 +19,12 @@ func (s *Server) handleHealth(c *gin.Context) {
 
 	for name, collector := range allCollectors {
 		var shouldCheck bool
-		if !s.config.LeaderElection.Enabled {
+		switch {
+		case !s.config.LeaderElection.Enabled:
 			shouldCheck = true
-		} else if collector.RequiresLeaderElection() {
+		case collector.RequiresLeaderElection():
 			shouldCheck = isLeader
-		} else {
+		default:
 			shouldCheck = true
 		}
 

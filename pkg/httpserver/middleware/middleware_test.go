@@ -1,12 +1,14 @@
-package middleware
+package middleware_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/labring/sealos-state-metrics/pkg/httpserver/middleware"
 	applogger "github.com/labring/sealos-state-metrics/pkg/logger"
 	log "github.com/sirupsen/logrus"
 )
@@ -20,7 +22,7 @@ func TestRequestLoggerInjectsLogger(t *testing.T) {
 	base.SetFormatter(&log.JSONFormatter{})
 
 	router := gin.New()
-	router.Use(RequestLogger(log.NewEntry(base), "test", func() bool { return false }))
+	router.Use(middleware.RequestLogger(log.NewEntry(base), "test", func() bool { return false }))
 	router.GET("/ok", func(c *gin.Context) {
 		entry, ok := applogger.EntryFromRequest(c.Request)
 		if !ok {
@@ -34,7 +36,7 @@ func TestRequestLoggerInjectsLogger(t *testing.T) {
 		c.Status(http.StatusNoContent)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/ok", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -57,12 +59,15 @@ func TestRecoveryRecoversPanic(t *testing.T) {
 
 	entry := log.NewEntry(base)
 	router := gin.New()
-	router.Use(RequestLogger(entry, "test", func() bool { return false }), Recovery(entry, "test"))
+	router.Use(
+		middleware.RequestLogger(entry, "test", func() bool { return false }),
+		middleware.Recovery(entry, "test"),
+	)
 	router.GET("/panic", func(c *gin.Context) {
 		panic("boom")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/panic", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

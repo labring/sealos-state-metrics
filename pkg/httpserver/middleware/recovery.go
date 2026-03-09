@@ -43,7 +43,7 @@ func Recovery(base *log.Entry, serverName string) gin.HandlerFunc {
 				requestDump := dumpRequest(c.Request)
 				brokenPipe := isBrokenPipe(recovered)
 
-				c.Error(panicErr).SetType(gin.ErrorTypePrivate)
+				_ = c.Error(panicErr).SetType(gin.ErrorTypePrivate)
 
 				switch {
 				case brokenPipe:
