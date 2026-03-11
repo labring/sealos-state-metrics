@@ -9,76 +9,49 @@ type FailureReason string
 
 const (
 	// FailureReasonImageNotFound indicates the image does not exist
-	FailureReasonImageNotFound FailureReason = "ImageNotFound"
+	FailureReasonImageNotFound FailureReason = "image_not_found"
 
-	// FailureReasonManifestNotFound indicates the manifest does not exist
-	FailureReasonManifestNotFound FailureReason = "ManifestNotFound"
+	// FailureReasonProxyError indicates a proxy connectivity error.
+	FailureReasonProxyError FailureReason = "proxy_error"
 
 	// FailureReasonUnauthorized indicates authentication failure
-	FailureReasonUnauthorized FailureReason = "Unauthorized"
+	FailureReasonUnauthorized FailureReason = "unauthorized"
 
-	// FailureReasonRegistryUnavailable indicates registry is unreachable
-	FailureReasonRegistryUnavailable FailureReason = "RegistryUnavailable"
+	// FailureReasonTLSHandshake indicates a TLS handshake/certificate failure.
+	FailureReasonTLSHandshake FailureReason = "tls_handshake_error"
 
-	// FailureReasonTimeout indicates pull timeout
-	FailureReasonTimeout FailureReason = "Timeout"
+	// FailureReasonIOTimeout indicates a network I/O timeout while pulling.
+	FailureReasonIOTimeout FailureReason = "io_timeout"
+
+	// FailureReasonConnectionRefused indicates the registry actively refused the connection.
+	FailureReasonConnectionRefused FailureReason = "connection_refused"
 
 	// FailureReasonNetworkError indicates network error
-	FailureReasonNetworkError FailureReason = "NetworkError"
-
-	// FailureReasonDiskPressure indicates disk pressure
-	FailureReasonDiskPressure FailureReason = "DiskPressure"
+	FailureReasonNetworkError FailureReason = "network_error"
 
 	// FailureReasonBackOff indicates backoff retry
-	FailureReasonBackOff FailureReason = "BackOff"
+	FailureReasonBackOff FailureReason = "back_off_pulling_image"
 
 	// FailureReasonUnknown indicates unknown failure
-	FailureReasonUnknown FailureReason = "Unknown"
+	FailureReasonUnknown FailureReason = "unknown"
 )
 
 var (
 	// Regular expressions for classifying failures
-	imageNotFoundPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)image.*not found`),
-		regexp.MustCompile(`(?i)repository.*not found`),
-		regexp.MustCompile(`(?i)404.*not found`),
-	}
-
-	manifestNotFoundPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)manifest.*not found`),
-		regexp.MustCompile(`(?i)manifest.*unknown`),
-	}
-
-	unauthorizedPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)unauthorized`),
-		regexp.MustCompile(`(?i)authentication required`),
-		regexp.MustCompile(`(?i)401`),
-		regexp.MustCompile(`(?i)forbidden`),
-		regexp.MustCompile(`(?i)403`),
-	}
-
-	registryUnavailablePatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)registry.*unavailable`),
-		regexp.MustCompile(`(?i)connection refused`),
-		regexp.MustCompile(`(?i)no such host`),
-		regexp.MustCompile(`(?i)dial tcp.*connection refused`),
-	}
-
-	timeoutPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)timeout`),
-		regexp.MustCompile(`(?i)context deadline exceeded`),
-		regexp.MustCompile(`(?i)i/o timeout`),
-	}
-
-	networkErrorPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)network.*error`),
-		regexp.MustCompile(`(?i)connection.*reset`),
-		regexp.MustCompile(`(?i)broken pipe`),
-		regexp.MustCompile(`(?i)EOF`),
-	}
+	reImageNotFound = regexp.MustCompile(
+		`(?i)not found|NotFound|manifest unknown|repository does not exist`,
+	)
+	reProxyError   = regexp.MustCompile(`(?i)proxyconnect|proxy error`)
+	reUnauthorized = regexp.MustCompile(
+		`(?i)unauthorized|authentication require|failed to authorize|authorization failed`,
+	)
+	reTLS               = regexp.MustCompile(`(?i)tls handshake|failed to verify certificate`)
+	reIOTimeout         = regexp.MustCompile(`(?i)i/o timeout`)
+	reConnectionRefused = regexp.MustCompile(`(?i)connection refused`)
+	reNetworkError      = regexp.MustCompile(`(?i)failed to do request`)
 )
 
-// FailureClassifier classifies image pull failures
+// FailureClassifier classifies image pull failures.
 type FailureClassifier struct{}
 
 // NewFailureClassifier creates a new failure classifier
@@ -86,84 +59,51 @@ func NewFailureClassifier() *FailureClassifier {
 	return &FailureClassifier{}
 }
 
-// Classify classifies the failure reason based on the error message
+// Classify classifies the failure reason based on the error message.
+// It intentionally mirrors the legacy main.go.back behavior so that
+// ImagePullBackOff does not overwrite a previously more specific root cause.
 func (c *FailureClassifier) Classify(reason, message string) FailureReason {
-	// Combine reason and message for matching
-	text := reason + " " + message
-
-	// Check reason first
-	switch reason {
-	case "ImagePullBackOff", "ErrImagePull":
-		// BackOff is a special case - analyze the message further
-		if matchesAny(text, imageNotFoundPatterns) {
+	lowMsg := strings.ToLower(message)
+	switch strings.ToLower(reason) {
+	case "errimagepull", "imagepullbackoff":
+		if reImageNotFound.MatchString(lowMsg) {
 			return FailureReasonImageNotFound
 		}
 
-		if matchesAny(text, manifestNotFoundPatterns) {
-			return FailureReasonManifestNotFound
+		if reProxyError.MatchString(lowMsg) {
+			return FailureReasonProxyError
 		}
 
-		if matchesAny(text, unauthorizedPatterns) {
+		if reUnauthorized.MatchString(lowMsg) {
 			return FailureReasonUnauthorized
 		}
 
-		if matchesAny(text, registryUnavailablePatterns) {
-			return FailureReasonRegistryUnavailable
+		if reTLS.MatchString(lowMsg) {
+			return FailureReasonTLSHandshake
 		}
 
-		if matchesAny(text, timeoutPatterns) {
-			return FailureReasonTimeout
+		if reIOTimeout.MatchString(lowMsg) {
+			return FailureReasonIOTimeout
 		}
 
-		if matchesAny(text, networkErrorPatterns) {
+		if reConnectionRefused.MatchString(lowMsg) {
+			return FailureReasonConnectionRefused
+		}
+
+		if reNetworkError.MatchString(lowMsg) {
 			return FailureReasonNetworkError
 		}
 
-		return FailureReasonBackOff
-	case "ImageInspectError":
-		return FailureReasonImageNotFound
-	}
+		if strings.HasPrefix(lowMsg, "back-off pulling image") {
+			return FailureReasonBackOff
+		}
 
-	// Check message patterns
-	if matchesAny(text, imageNotFoundPatterns) {
-		return FailureReasonImageNotFound
+		return FailureReasonUnknown
+	default:
+		return FailureReason(strings.ToLower(reason))
 	}
-
-	if matchesAny(text, manifestNotFoundPatterns) {
-		return FailureReasonManifestNotFound
-	}
-
-	if matchesAny(text, unauthorizedPatterns) {
-		return FailureReasonUnauthorized
-	}
-
-	if matchesAny(text, registryUnavailablePatterns) {
-		return FailureReasonRegistryUnavailable
-	}
-
-	if matchesAny(text, timeoutPatterns) {
-		return FailureReasonTimeout
-	}
-
-	if matchesAny(text, networkErrorPatterns) {
-		return FailureReasonNetworkError
-	}
-
-	// Check for disk pressure
-	if strings.Contains(strings.ToLower(text), "disk pressure") {
-		return FailureReasonDiskPressure
-	}
-
-	return FailureReasonUnknown
 }
 
-// matchesAny checks if the text matches any of the patterns
-func matchesAny(text string, patterns []*regexp.Regexp) bool {
-	for _, pattern := range patterns {
-		if pattern.MatchString(text) {
-			return true
-		}
-	}
-
-	return false
+func isSpecificReason(reason FailureReason) bool {
+	return reason != FailureReasonBackOff && reason != FailureReasonUnknown
 }
