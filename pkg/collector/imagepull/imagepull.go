@@ -34,6 +34,7 @@ type SlowPullInfo struct {
 	Image     string
 	Node      string
 	Registry  string
+	StartedAt time.Time
 }
 
 // Collector collects image pull metrics
@@ -67,7 +68,7 @@ func (c *Collector) initMetrics(namespace string) {
 	)
 	c.imagePullSlow = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "image", "pull_slow"),
-		"Slow image pulls (duration > threshold)",
+		"Current slow image pull duration in seconds after exceeding the configured threshold",
 		[]string{"namespace", "pod", "node", "registry", "image"},
 		nil,
 	)
@@ -169,10 +170,20 @@ func (c *Collector) processPod(ctx context.Context, pod *corev1.Pod) {
 
 		// Check for image pull failures
 		if containerStatus.State.Waiting != nil &&
-			c.isImagePullFailure(containerStatus.State.Waiting.Reason) {
+			c.isImagePullFailure(containerStatus.State.Waiting.Reason) &&
+			isPublicRegistry(containerStatus.Image) {
 			waiting := containerStatus.State.Waiting
-			reason := c.classifier.Classify(waiting.Reason, waiting.Message)
 			registry := parseRegistry(containerStatus.Image)
+			reason := c.classifier.Classify(waiting.Reason, waiting.Message)
+
+			if previous, exists := c.failures[key]; exists &&
+				previous.Node == nodeName &&
+				previous.Image == containerStatus.Image &&
+				previous.Registry == registry &&
+				reason == FailureReasonBackOff &&
+				isSpecificReason(previous.Reason) {
+				reason = previous.Reason
+			}
 
 			c.failures[key] = &PullFailureInfo{
 				Namespace: pod.Namespace,
@@ -194,9 +205,7 @@ func (c *Collector) processPod(ctx context.Context, pod *corev1.Pod) {
 		delete(c.failures, key)
 
 		// Check for slow pull (container is waiting in ContainerCreating state)
-		if containerStatus.ContainerID == "" &&
-			containerStatus.State.Waiting != nil &&
-			containerStatus.State.Waiting.Reason == "ContainerCreating" {
+		if c.isSlowPullCandidate(containerStatus) {
 			c.checkSlowPull(ctx,
 				key, pod, containerStatus, nodeName,
 			)
@@ -210,11 +219,24 @@ func (c *Collector) processPod(ctx context.Context, pod *corev1.Pod) {
 // isImagePullFailure checks if a reason indicates image pull failure
 func (c *Collector) isImagePullFailure(reason string) bool {
 	switch reason {
-	case "ErrImagePull", "ImagePullBackOff", "Cancelled", "RegistryUnavailable":
+	case "ErrImagePull", "ImagePullBackOff", "Cancelled", "RegistryUnavailable",
+		"InvalidImageName", "ImageInspectError", "ErrImageNeverPull":
 		return true
 	default:
 		return false
 	}
+}
+
+func (c *Collector) isSlowPullCandidate(cs corev1.ContainerStatus) bool {
+	if cs.ContainerID != "" || cs.State.Waiting == nil {
+		return false
+	}
+
+	if cs.State.Waiting.Reason != "ContainerCreating" {
+		return false
+	}
+
+	return !isBackOffPullingImage(cs.State.Waiting.Reason, cs.State.Waiting.Message)
 }
 
 // checkSlowPull checks if an image pull is slow
@@ -278,9 +300,7 @@ func (c *Collector) handleSlowPullTimer(
 		}
 
 		// If still waiting and not in failure state, it's a slow pull
-		if cs.ContainerID == "" &&
-			cs.State.Waiting != nil &&
-			cs.State.Waiting.Reason == "ContainerCreating" {
+		if c.isSlowPullCandidate(cs) {
 			registry := parseRegistry(image)
 
 			c.slowPulls[key] = &SlowPullInfo{
@@ -290,6 +310,7 @@ func (c *Collector) handleSlowPullTimer(
 				Image:     image,
 				Node:      nodeName,
 				Registry:  registry,
+				StartedAt: time.Now().Add(-c.config.SlowPullThreshold),
 			}
 
 			c.logger.WithFields(log.Fields{
@@ -338,10 +359,15 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 
 	// Collect slow pulls
 	for _, info := range c.slowPulls {
+		durationSeconds := time.Since(info.StartedAt).Seconds()
+		if durationSeconds < 0 {
+			durationSeconds = 0
+		}
+
 		ch <- prometheus.MustNewConstMetric(
 			c.imagePullSlow,
 			prometheus.GaugeValue,
-			1,
+			durationSeconds,
 			info.Namespace,
 			info.Pod,
 			info.Node,
@@ -368,4 +394,29 @@ func parseRegistry(image string) string {
 	}
 
 	return "docker.io"
+}
+
+func isBackOffPullingImage(reason, message string) bool {
+	if strings.EqualFold(reason, "imagepullbackoff") {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(message), "back-off pulling image")
+}
+
+func isPublicRegistry(image string) bool {
+	if !strings.Contains(image, "/") {
+		return true
+	}
+
+	return strings.HasPrefix(image, "docker.io/") ||
+		strings.HasPrefix(image, "gcr.io/") ||
+		strings.HasPrefix(image, "ghcr.io/") ||
+		strings.HasPrefix(image, "k8s.gcr.io/") ||
+		strings.HasPrefix(image, "quay.io/") ||
+		strings.HasPrefix(image, "registry.k8s.io/") ||
+		(strings.HasPrefix(image, "registry.") && strings.Contains(image, ".aliyuncs.com/")) ||
+		(strings.HasPrefix(image, "hub.") && strings.Contains(image, ".sealos.run/")) ||
+		strings.HasPrefix(image, "sealos.hub") ||
+		strings.Contains(image, ".cr.aliyuncs.com/")
 }

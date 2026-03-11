@@ -2514,7 +2514,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "镜像拉取缓慢列表",
+          "description": "镜像拉取缓慢列表，值为当前已持续的慢拉取秒数",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2579,7 +2579,6 @@
               "options": {
                 "excludeByName": {
                   "Time": true,
-                  "Value": true,
                   "__name__": true,
                   "instance": true,
                   "job": true
@@ -2589,14 +2588,16 @@
                   "pod": 1,
                   "node": 2,
                   "image": 3,
-                  "registry": 4
+                  "registry": 4,
+                  "Value": 5
                 },
                 "renameByName": {
                   "image": "镜像",
                   "namespace": "命名空间",
                   "node": "节点",
                   "pod": "Pod",
-                  "registry": "镜像仓库"
+                  "registry": "镜像仓库",
+                  "Value": "持续时间(秒)"
                 }
               }
             }
