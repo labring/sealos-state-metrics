@@ -1,3 +1,4 @@
+//nolint:testpackage
 package imagepull
 
 import (
@@ -88,9 +89,9 @@ func TestFailureClassifierMatchesLegacyRules(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			got := classifier.Classify(tt.reason, tt.message)
 			if got != tt.expected {
 				t.Fatalf("Classify(%q, %q) = %q, want %q", tt.reason, tt.message, got, tt.expected)
@@ -177,7 +178,6 @@ func TestProcessPodTracksRealKubeletImageFailureReasons(t *testing.T) {
 	reasons := []string{"InvalidImageName", "ImageInspectError", "ErrImageNeverPull"}
 
 	for _, reason := range reasons {
-		reason := reason
 		t.Run(reason, func(t *testing.T) {
 			t.Parallel()
 
@@ -202,6 +202,7 @@ func TestProcessPodTracksRealKubeletImageFailureReasons(t *testing.T) {
 			c.processPod(context.Background(), pod)
 
 			key := pullInfoKey("default", "demo", "app")
+
 			info, ok := c.failures[key]
 			if !ok {
 				t.Fatalf("expected failure to be tracked for reason %q", reason)
@@ -256,6 +257,7 @@ func TestCollectSlowPullExportsDurationSeconds(t *testing.T) {
 	close(ch)
 
 	metric := <-ch
+
 	dtoMetric := &dto.Metric{}
 	if err := metric.Write(dtoMetric); err != nil {
 		t.Fatalf("failed to write metric: %v", err)
