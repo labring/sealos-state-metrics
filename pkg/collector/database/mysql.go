@@ -21,7 +21,8 @@ type MySQLConnectionInfo struct {
 	DSN      string
 }
 
-// checkMySQLConnectivity checks MySQL database connectivity
+// checkMySQLConnectivity checks MySQL database connectivity.
+// It runs full checks every N times (DBCheckMod), and basic checks otherwise.
 func (c *Collector) checkMySQLConnectivity(
 	ctx context.Context,
 	secret *corev1.Secret,
@@ -34,22 +35,81 @@ func (c *Collector) checkMySQLConnectivity(
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
 
-	c.logger.Debugf("Connecting to MySQL: %s (namespace: %s)", connInfo.Endpoint, namespace)
+	checkSeq := c.mysqlCheckCounter.Add(1)
+	runFull := c.shouldRunMySQLFullCheck(checkSeq)
 
-	// 2. Establish initial connection (without specifying database)
+	c.logger.WithFields(map[string]interface{}{
+		"endpoint":   connInfo.Endpoint,
+		"namespace":  namespace,
+		"check_seq":  checkSeq,
+		"full_check": runFull,
+	}).Debug("Running MySQL connectivity check")
+
+	if runFull {
+		return c.checkMySQLFullConnectivity(ctx, connInfo)
+	}
+
+	return c.checkMySQLBasicConnectivity(ctx, connInfo)
+}
+
+// shouldRunMySQLFullCheck returns whether the current check should run in full mode.
+func (c *Collector) shouldRunMySQLFullCheck(checkSeq uint64) bool {
+	interval := c.config.DBCheckMod
+	// If interval <= 1, run full check every time.
+	if interval <= 1 {
+		return true
+	}
+
+	return checkSeq%uint64(interval) == 0
+}
+
+// checkMySQLBasicConnectivity runs lightweight checks only (Ping + SELECT 1).
+func (c *Collector) checkMySQLBasicConnectivity(
+	ctx context.Context,
+	connInfo *MySQLConnectionInfo,
+) error {
 	db, err := c.openMySQLConnection(connInfo.DSN)
 	if err != nil {
 		return fmt.Errorf("failed to open connection: %w", err)
 	}
 	defer db.Close()
 
-	// 3. Test basic connection
 	if err := c.testMySQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
 		return err
 	}
 
+	if err := c.testMySQLBasicQuery(ctx, db); err != nil {
+		return err
+	}
+
+	c.logger.Debugf("MySQL basic connectivity check passed: %s", connInfo.Endpoint)
+	return nil
+}
+
+// checkMySQLFullConnectivity runs full permission checks with temporary DB/table operations.
+func (c *Collector) checkMySQLFullConnectivity(
+	ctx context.Context,
+	connInfo *MySQLConnectionInfo,
+) error {
+	// 1. Establish initial connection (without specifying database)
+	db, err := c.openMySQLConnection(connInfo.DSN)
+	if err != nil {
+		return fmt.Errorf("failed to open connection: %w", err)
+	}
+	defer db.Close()
+
+	// 2. Test basic connection
+	if err := c.testMySQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
+		return err
+	}
+
+	// 3. Test basic query
+	if err := c.testMySQLBasicQuery(ctx, db); err != nil {
+		return err
+	}
+
 	// 4. Generate test database name
-	testDBName := fmt.Sprintf("test_db_%d", time.Now().Unix())
+	testDBName := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 
 	// 5. Test database-level permissions
 	if err := c.testMySQLDatabasePermissions(ctx, db, testDBName); err != nil {
@@ -76,8 +136,7 @@ func (c *Collector) checkMySQLConnectivity(
 		// Do not return error as tests already passed
 	}
 
-	c.logger.Infof("MySQL all permission tests passed: %s", connInfo.Endpoint)
-
+	c.logger.Infof("MySQL full permission tests passed: %s", connInfo.Endpoint)
 	return nil
 }
 
@@ -178,6 +237,21 @@ func (c *Collector) testMySQLBasicConnection(
 	return nil
 }
 
+// testMySQLBasicQuery validates minimal query capability.
+func (c *Collector) testMySQLBasicQuery(ctx context.Context, db *sql.DB) error {
+	var result int
+	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(&result); err != nil {
+		c.logger.WithError(err).Error("MySQL basic query failed")
+		return fmt.Errorf("failed to execute basic query: %w", err)
+	}
+
+	if result != 1 {
+		return fmt.Errorf("unexpected basic query result: %d", result)
+	}
+
+	return nil
+}
+
 // testMySQLDatabasePermissions tests database-level permissions
 func (c *Collector) testMySQLDatabasePermissions(
 	ctx context.Context,
@@ -236,7 +310,7 @@ func (c *Collector) reconnectToDatabase(
 		return nil, fmt.Errorf("failed to ping test database: %w", err)
 	}
 
-	c.logger.Debugf("✓ Connected to test database: %s", dbName)
+	c.logger.Debugf("Connected to test database: %s", dbName)
 
 	return db, nil
 }

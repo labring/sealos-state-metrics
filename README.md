@@ -238,6 +238,7 @@ collectors:
   database:
     checkInterval: "5m"
     checkTimeout: "10s"
+    dbCheckMod: 12  # MySQL: run full permission check every 12 checks
     namespaces: []  # Empty = all namespaces
 
   lvm:

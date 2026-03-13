@@ -190,6 +190,9 @@ collectors:
     checkInterval: "5m"
     # Timeout for each database connection attempt
     checkTimeout: "10s"
+    # MySQL full-check interval: every N checks run full permission check,
+    # other checks run lightweight basic check (Ping + SELECT 1)
+    dbCheckMod: 12
     # List of namespaces to scan for databases (empty = all namespaces)
     namespaces: []
       # - ns-kkeniczm

@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector/base"
@@ -70,6 +71,9 @@ type Collector struct {
 	// Secret cache and preflight checker
 	secretCache      *SecretCache
 	preflightChecker *PreflightChecker
+
+	// Internal MySQL check counter for basic/full mode switching
+	mysqlCheckCounter atomic.Uint64
 }
 
 // initMetrics initializes Prometheus metric descriptors

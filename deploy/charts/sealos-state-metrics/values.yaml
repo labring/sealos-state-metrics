@@ -157,6 +157,9 @@ collectors:
   database:
     checkTimeout: "10s"
     checkInterval: "5m"
+    # MySQL full-check interval: every N checks run full permission check,
+    # other checks run lightweight basic check (Ping + SELECT 1)
+    dbCheckMod: 12
     namespaces: []  # Empty means all namespaces
     # Concurrency settings for database connection checks
     # Controls maximum concurrent connections per database type

@@ -16,7 +16,9 @@ This collector:
 ### MySQL
 - **Secret Pattern**: `{instance-name}-conn-credential`
 - **Connection Format**: `mysql://username:password@{instance}-mysql.{namespace}.svc:3306`
-- **Validation**: Creates/drops test database and table, performs INSERT/SELECT operations
+- **Validation**:
+  - **Basic check** (default most runs): `Ping + SELECT 1`
+  - **Full check** (periodic): Creates/drops test database and table, performs INSERT/SELECT/UPDATE/DELETE operations
 
 ### PostgreSQL
 - **Secret Pattern**: `{instance-name}-conn-credential`
@@ -45,6 +47,10 @@ collectors:
 
     # Timeout for each database connection attempt (default: 10s)
     checkTimeout: "10s"
+
+    # MySQL full-check interval (default: 12)
+    # Every N checks runs full permission validation; others run basic check
+    dbCheckMod: 12
 
     # List of namespaces to scan for databases (empty = all namespaces)
     namespaces: []
@@ -77,6 +83,9 @@ export COLLECTORS_DATABASE_CHECK_INTERVAL=10m
 
 # Check timeout
 export COLLECTORS_DATABASE_CHECK_TIMEOUT=20s
+
+# MySQL full-check interval
+export COLLECTORS_DATABASE_DB_CHECK_MOD=12
 
 # Namespaces (comma-separated)
 export COLLECTORS_DATABASE_NAMESPACES=ns-user1,ns-user2

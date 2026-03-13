@@ -16,6 +16,9 @@ type Config struct {
 	PostgreSQLConcurrency int `yaml:"postgresqlConcurrency" json:"postgresql_concurrency" env:"POSTGRESQL_CONCURRENCY"`
 	MongoDBConcurrency    int `yaml:"mongodbConcurrency"    json:"mongodb_concurrency"    env:"MONGODB_CONCURRENCY"`
 	RedisConcurrency      int `yaml:"redisConcurrency"      json:"redis_concurrency"      env:"REDIS_CONCURRENCY"`
+	// MySQL full-check interval. Every N checks performs full permission test;
+	// other checks use lightweight basic check.
+	DBCheckMod int `yaml:"dbCheckMod" json:"db_check_mod" env:"DB_CHECK_MOD"`
 }
 
 // NewDefaultConfig returns the default configuration
@@ -28,5 +31,6 @@ func NewDefaultConfig() *Config {
 		PostgreSQLConcurrency: 50,         // Default: 50 concurrent PostgreSQL connections
 		MongoDBConcurrency:    50,         // Default: 50 concurrent MongoDB connections
 		RedisConcurrency:      100,        // Default: 100 concurrent Redis connections (Redis is typically faster)
+		DBCheckMod:            12,         // Default: run one full MySQL check every 12 checks
 	}
 }
