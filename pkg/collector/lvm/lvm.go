@@ -25,10 +25,14 @@ type Collector struct {
 	// Metrics descriptors
 	lvmVgsTotalCapacity *prometheus.Desc
 	lvmVgsTotalFree     *prometheus.Desc
+	lvmVgsMetadataSize  *prometheus.Desc
+	lvmVgsMetadataFree  *prometheus.Desc
 
 	// Current metric values
 	totalCapacity float64
 	totalFree     float64
+	metadataSize  float64
+	metadataFree  float64
 }
 
 // initMetrics initializes Prometheus metric descriptors
@@ -45,10 +49,24 @@ func (c *Collector) initMetrics(namespace string) {
 		[]string{"node"},
 		nil,
 	)
+	c.lvmVgsMetadataSize = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "lvm", "vgs_metadata_size"),
+		"Total metadata size of all volume groups in bytes",
+		[]string{"node"},
+		nil,
+	)
+	c.lvmVgsMetadataFree = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "lvm", "vgs_metadata_free"),
+		"Total free metadata space of all volume groups in bytes",
+		[]string{"node"},
+		nil,
+	)
 
 	// Register descriptors
 	c.MustRegisterDesc(c.lvmVgsTotalCapacity)
 	c.MustRegisterDesc(c.lvmVgsTotalFree)
+	c.MustRegisterDesc(c.lvmVgsMetadataSize)
+	c.MustRegisterDesc(c.lvmVgsMetadataFree)
 }
 
 // updateMetrics updates LVM metrics by querying the system
@@ -65,21 +83,29 @@ func (c *Collector) updateMetrics() {
 	}
 
 	vgAmountTotal := resource.NewQuantity(0, resource.BinarySI)
-
 	vgFreeTotal := resource.NewQuantity(0, resource.BinarySI)
+	vgMetadataSize := resource.NewQuantity(0, resource.BinarySI)
+	vgMetadataFree := resource.NewQuantity(0, resource.BinarySI)
+
 	for _, vg := range vgs {
 		vgAmountTotal.Add(vg.Size)
 		vgFreeTotal.Add(vg.Free)
+		vgMetadataSize.Add(vg.MetadataSize)
+		vgMetadataFree.Add(vg.MetadataFree)
 	}
 
 	c.mu.Lock()
 	c.totalCapacity = float64(vgAmountTotal.Value())
 	c.totalFree = float64(vgFreeTotal.Value())
+	c.metadataSize = float64(vgMetadataSize.Value())
+	c.metadataFree = float64(vgMetadataFree.Value())
 	c.mu.Unlock()
 
 	c.logger.WithFields(log.Fields{
 		"total_capacity": vgAmountTotal.String(),
 		"total_free":     vgFreeTotal.String(),
+		"metadata_size":  vgMetadataSize.String(),
+		"metadata_free":  vgMetadataFree.String(),
 	}).Debug("Updated LVM metrics")
 }
 
@@ -100,6 +126,20 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 			c.lvmVgsTotalFree,
 			prometheus.GaugeValue,
 			c.totalFree,
+			c.config.NodeName,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.lvmVgsMetadataSize,
+			prometheus.GaugeValue,
+			c.metadataSize,
+			c.config.NodeName,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.lvmVgsMetadataFree,
+			prometheus.GaugeValue,
+			c.metadataFree,
 			c.config.NodeName,
 		)
 	}
