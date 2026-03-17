@@ -186,7 +186,7 @@ collectors:
   # Automatically discovers databases from KubeBlocks clusters in the cluster
   # Supports: MySQL, PostgreSQL, MongoDB, Redis
   database:
-    # Check interval for database connectivity tests
+    # Check interval for database connectivity checks
     checkInterval: "5m"
     # Timeout for each database connection attempt
     checkTimeout: "10s"
