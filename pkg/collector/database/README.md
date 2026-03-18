@@ -7,7 +7,7 @@ The Database collector monitors the connectivity status of databases deployed in
 This collector:
 - Automatically discovers databases in Kubernetes namespaces
 - Supports MySQL, PostgreSQL, MongoDB, and Redis
-- Performs connectivity tests with validation queries
+- Performs basic connectivity tests
 - Exposes connectivity status and response time metrics
 - Works with KubeBlocks-managed database clusters
 
@@ -16,22 +16,22 @@ This collector:
 ### MySQL
 - **Secret Pattern**: `{instance-name}-conn-credential`
 - **Connection Format**: `mysql://username:password@{instance}-mysql.{namespace}.svc:3306`
-- **Validation**: Creates/drops test database and table, performs INSERT/SELECT operations
+- **Validation**: Establishes a connection and runs a Ping check
 
 ### PostgreSQL
 - **Secret Pattern**: `{instance-name}-conn-credential`
 - **Connection Format**: `postgresql://username:password@{instance}-postgresql.{namespace}.svc:5432`
-- **Validation**: Lists databases, creates/drops test table, performs INSERT/SELECT operations
+- **Validation**: Establishes a connection and runs a Ping check
 
 ### MongoDB
 - **Secret Pattern**: `{instance-name}-mongodb-account-root`
 - **Connection Format**: `mongodb://username:password@{instance}-mongodb.{namespace}.svc:27017`
-- **Validation**: Lists databases, inserts/finds/drops test documents
+- **Validation**: Establishes a connection and runs a Ping check
 
 ### Redis
 - **Secret Pattern**: `{instance-name}-redis-account-default`
 - **Connection Format**: `redis://username:password@{instance}-redis-redis.{namespace}.svc:6379`
-- **Validation**: SET/GET/DEL test keys
+- **Validation**: Establishes a connection and runs a Ping check
 
 ## Configuration
 
@@ -284,13 +284,8 @@ If any preflight check fails, the database is immediately marked as unavailable 
 For databases passing preflight checks:
 
 1. **Connection Establishment**: Creates connection using Secret credentials
-2. **Database-Specific Validation**:
-   - **MySQL**: CREATE/USE/DROP database and table operations
-   - **PostgreSQL**: List databases, CREATE/DROP table operations
-   - **MongoDB**: List databases, INSERT/FIND/DROP document operations
-   - **Redis**: SET/GET/DEL key operations
+2. **Basic Validation**: Runs a Ping check after the connection is established
 3. **Response Time Recording**: Measures total time including preflight checks
-4. **Cleanup**: Removes all test data
 
 #### Stage 3: Parallel Execution
 All connection tests run concurrently with controlled parallelism:
@@ -302,12 +297,10 @@ All connection tests run concurrently with controlled parallelism:
 
 ### Health Checks
 
-The collector performs comprehensive validation:
+The collector performs lightweight validation:
 - Connection establishment
 - Authentication verification
-- Read/write permissions
-- Basic query execution
-- Cleanup operations
+- Ping execution
 
 ## Requirements
 
@@ -637,7 +630,7 @@ rate(sealos_database_connectivity[5m])
 
 2. **Network Policies**: If using network policies, allow traffic from the collector to database services.
 
-3. **Read-Only Operations**: The collector creates and drops test resources but does not access production data.
+3. **Low-Impact Operations**: The collector only establishes a connection and performs Ping checks; it does not create, modify, or delete database data.
 
 4. **Credential Rotation**: When rotating database credentials, the collector will automatically use new credentials on the next check.
 
@@ -662,7 +655,7 @@ rate(sealos_database_connectivity[5m])
   - Per-database: One short-lived connection per check interval
 
 - **Database Load**:
-  - **Per check**: Minimal (simple validation queries executing in 10-100ms)
+  - **Per check**: Minimal (connection establishment and Ping in 10-100ms)
   - **Preflight optimization**: ~30-50% of checks never reach the database (fast-fail)
   - **Parallel checking**: No sequential bottlenecks
 
@@ -825,8 +818,7 @@ Startup → [Check Interval Loop]
 
 4. **Database Connectors** (`mysql.go`, `postgresql.go`, `mongodb.go`, `redis.go`):
    - Implement database-specific connection logic
-   - Perform validation queries
-   - Handle cleanup
+   - Perform Ping-based connectivity checks
 
 ## Related Collectors
 
