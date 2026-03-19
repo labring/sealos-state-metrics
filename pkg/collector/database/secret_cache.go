@@ -14,6 +14,21 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+var cachedSecretDataKeys = map[string]struct{}{
+	"username": {},
+	"password": {},
+	"host":     {},
+	"port":     {},
+	"endpoint": {},
+	"url":      {},
+}
+
+var cachedSecretLabelKeys = map[string]struct{}{
+	"apps.kubeblocks.io/cluster-type":   {},
+	"app.kubernetes.io/name":            {},
+	"apps.kubeblocks.io/component-name": {},
+}
+
 // SecretCache manages a cache of database secrets using standard informers
 type SecretCache struct {
 	client          kubernetes.Interface
@@ -80,6 +95,10 @@ func (sc *SecretCache) Start(ctx context.Context, namespaces []string) error {
 				options.LabelSelector = selector
 			}),
 		).Core().V1().Secrets().Informer()
+
+		if err := informer.SetTransform(sc.trimSecretForCache); err != nil {
+			return fmt.Errorf("failed to set transform for %s informer: %w", dbType, err)
+		}
 
 		// Add event handlers
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -154,6 +173,69 @@ func (sc *SecretCache) Start(ctx context.Context, namespaces []string) error {
 		Info("Secret cache started with informer mechanism")
 
 	return nil
+}
+
+func (sc *SecretCache) trimSecretForCache(obj any) (any, error) {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return obj, nil
+	}
+
+	trimmed := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            secret.Name,
+			Namespace:       secret.Namespace,
+			Labels:          trimSecretLabels(secret.Labels),
+			ResourceVersion: secret.ResourceVersion,
+		},
+		Type: secret.Type,
+		Data: trimSecretData(secret.Data),
+	}
+
+	if secret.Immutable != nil {
+		immutable := *secret.Immutable
+		trimmed.Immutable = &immutable
+	}
+
+	return trimmed, nil
+}
+
+func trimSecretLabels(labels map[string]string) map[string]string {
+	if len(labels) == 0 {
+		return nil
+	}
+
+	trimmed := make(map[string]string)
+	for key, value := range labels {
+		if _, ok := cachedSecretLabelKeys[key]; ok {
+			trimmed[key] = value
+		}
+	}
+
+	if len(trimmed) == 0 {
+		return nil
+	}
+
+	return trimmed
+}
+
+func trimSecretData(data map[string][]byte) map[string][]byte {
+	if len(data) == 0 {
+		return nil
+	}
+
+	trimmed := make(map[string][]byte)
+	for key, value := range data {
+		if _, ok := cachedSecretDataKeys[key]; ok {
+			trimmed[key] = append([]byte(nil), value...)
+		}
+	}
+
+	if len(trimmed) == 0 {
+		return nil
+	}
+
+	return trimmed
 }
 
 // getAllInformerSyncs returns all informer HasSynced functions
