@@ -3,6 +3,9 @@ package database
 
 import (
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestSanitizeIdentifier(t *testing.T) {
@@ -247,6 +250,73 @@ func TestDecodeSecret(t *testing.T) {
 				t.Errorf("decodeSecret() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTrimSecretForCache(t *testing.T) {
+	sc := &SecretCache{}
+	immutable := true
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "demo-conn-credential",
+			Namespace: "db-ns",
+			Labels: map[string]string{
+				"apps.kubeblocks.io/cluster-type": "mysql",
+				"keep":                            "no",
+			},
+			Annotations:     map[string]string{"big": "metadata"},
+			ResourceVersion: "12345",
+		},
+		Type:      corev1.SecretTypeOpaque,
+		Immutable: &immutable,
+		Data: map[string][]byte{
+			"username": []byte("user1"),
+			"password": []byte("pass1"),
+			"endpoint": []byte("mysql:3306"),
+			"unused":   []byte("drop-me"),
+		},
+	}
+
+	trimmedObj, err := sc.trimSecretForCache(secret)
+	if err != nil {
+		t.Fatalf("trimSecretForCache() returned error: %v", err)
+	}
+
+	trimmed, ok := trimmedObj.(*corev1.Secret)
+	if !ok {
+		t.Fatalf("trimSecretForCache() returned %T, want *corev1.Secret", trimmedObj)
+	}
+
+	if trimmed.Name != "demo-conn-credential" || trimmed.Namespace != "db-ns" {
+		t.Fatalf("trimmed secret metadata mismatch: got %s/%s", trimmed.Namespace, trimmed.Name)
+	}
+
+	if trimmed.Annotations != nil {
+		t.Fatalf("Annotations should be removed, got %v", trimmed.Annotations)
+	}
+
+	if trimmed.Labels["apps.kubeblocks.io/cluster-type"] != "mysql" {
+		t.Fatalf("expected database label to be preserved")
+	}
+
+	if _, ok := trimmed.Labels["keep"]; ok {
+		t.Fatalf("unexpected non-database label preserved")
+	}
+
+	if _, ok := trimmed.Data["username"]; !ok {
+		t.Fatalf("expected username field to be preserved")
+	}
+
+	if _, ok := trimmed.Data["unused"]; ok {
+		t.Fatalf("unexpected data field preserved")
+	}
+
+	if trimmed.ResourceVersion != "12345" {
+		t.Fatalf("ResourceVersion = %q, want %q", trimmed.ResourceVersion, "12345")
+	}
+
+	if trimmed.Immutable == nil || !*trimmed.Immutable {
+		t.Fatalf("Immutable flag should be preserved")
 	}
 }
 
