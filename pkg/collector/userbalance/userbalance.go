@@ -138,5 +138,18 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 			user.Type,
 			user.Level,
 		)
+
+		user.Type = "quota"
+		ch <- prometheus.MustNewConstMetric(
+			c.balanceGauge,
+			prometheus.GaugeValue,
+			user.Quota,
+			user.Region,
+			user.UUID,
+			user.UID,
+			user.Owner,
+			user.Type,
+			user.Level,
+		)
 	}
 }
