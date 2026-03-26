@@ -98,6 +98,7 @@ func CheckHTTPWithIP(
 				}).DialContext(ctx, network, net.JoinHostPort(ip, strconv.Itoa(port)))
 			},
 			TLSClientConfig: &tls.Config{
+				//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
 				InsecureSkipVerify: skipTLSVerify,
 				MinVersion:         tls.VersionTLS12,
 				ServerName:         host,
@@ -170,6 +171,7 @@ func getTLSCert(
 ) (*CertInfo, error) {
 	dialer := &tls.Dialer{
 		Config: &tls.Config{
+			//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
 			InsecureSkipVerify: skipTLSVerify,
 			MinVersion:         tls.VersionTLS12,
 			ServerName:         host,

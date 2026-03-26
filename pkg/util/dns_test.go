@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests need access to internal DNS family filtering helper.
 package util
 
 import (

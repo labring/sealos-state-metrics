@@ -3,6 +3,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -31,7 +32,13 @@ func TestCompositeConfigLoader_ReturnsErrorAndContinues(t *testing.T) {
 		stubLoader{err: errors.New("loader one failed")},
 		stubLoader{
 			load: func(_ string, target any) error {
-				target.(*chainTestConfig).Name = "loaded"
+				cfg, ok := target.(*chainTestConfig)
+				if !ok {
+					return fmt.Errorf("unexpected target type %T", target)
+				}
+
+				cfg.Name = "loaded"
+
 				return nil
 			},
 		},
@@ -62,7 +69,13 @@ func TestWrapConfigLoader_ReturnsErrorAndContinues(t *testing.T) {
 		Add(stubLoader{err: errors.New("loader one failed")}).
 		Add(stubLoader{
 			load: func(_ string, target any) error {
-				target.(*chainTestConfig).Name = "loaded"
+				cfg, ok := target.(*chainTestConfig)
+				if !ok {
+					return fmt.Errorf("unexpected target type %T", target)
+				}
+
+				cfg.Name = "loaded"
+
 				return nil
 			},
 		})

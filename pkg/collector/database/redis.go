@@ -39,7 +39,7 @@ func (c *Collector) checkRedisConnectivity(
 	defer client.Close()
 
 	// 3. Test basic connection
-	if err := c.testRedisBasicConnection(ctx, client, connInfo.Endpoint); err != nil {
+	if err := c.testRedisBasicConnection(ctx, client); err != nil {
 		return err
 	}
 
@@ -96,7 +96,6 @@ func (c *Collector) openRedisConnection(connInfo *RedisConnectionInfo) (*redis.C
 func (c *Collector) testRedisBasicConnection(
 	ctx context.Context,
 	client *redis.Client,
-	endpoint string,
 ) error {
 	if err := client.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("failed to ping Redis: %w", err)

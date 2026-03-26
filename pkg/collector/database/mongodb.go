@@ -46,7 +46,7 @@ func (c *Collector) checkMongoDBConnectivity(
 	}()
 
 	// 3. Test basic connection
-	if err := c.testMongoDBBasicConnection(ctx, client, connInfo.Endpoint); err != nil {
+	if err := c.testMongoDBBasicConnection(ctx, client); err != nil {
 		return err
 	}
 
@@ -115,7 +115,6 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 func (c *Collector) testMongoDBBasicConnection(
 	ctx context.Context,
 	client *mongo.Client,
-	endpoint string,
 ) error {
 	if err := client.Ping(ctx, nil); err != nil {
 		return fmt.Errorf("failed to ping MongoDB: %w", err)

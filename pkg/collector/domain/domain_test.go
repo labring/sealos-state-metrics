@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests need access to collector internals for metric emission verification.
 package domain
 
 import (
@@ -65,13 +66,14 @@ func TestCollectSkipsUncheckedStatusesAndUsesEmptyErrorTypeOnSuccess(t *testing.
 
 	for metric := range ch {
 		descText := metric.Desc().String()
+
 		var dtoMetric dto.Metric
 		if err := metric.Write(&dtoMetric); err != nil {
 			t.Fatalf("metric.Write() failed: %v", err)
 		}
 
-		labels := make(map[string]string, len(dtoMetric.Label))
-		for _, label := range dtoMetric.Label {
+		labels := make(map[string]string, len(dtoMetric.GetLabel()))
+		for _, label := range dtoMetric.GetLabel() {
 			labels[label.GetName()] = label.GetValue()
 		}
 
@@ -93,6 +95,7 @@ func TestCollectSkipsUncheckedStatusesAndUsesEmptyErrorTypeOnSuccess(t *testing.
 
 		if domain == "example.com" && ip == "104.18.26.120" && checkType == "http" {
 			httpSuccessFound = true
+
 			if errorType != "" {
 				t.Fatalf("http success error_type = %q, want empty", errorType)
 			}
@@ -100,6 +103,7 @@ func TestCollectSkipsUncheckedStatusesAndUsesEmptyErrorTypeOnSuccess(t *testing.
 
 		if domain == "example.com" && ip == "104.18.26.120" && checkType == "cert" {
 			certSuccessFound = true
+
 			if errorType != "" {
 				t.Fatalf("cert success error_type = %q, want empty", errorType)
 			}

@@ -41,7 +41,7 @@ func (c *Collector) checkPostgreSQLConnectivity(
 	defer db.Close()
 
 	// 3. Test basic connection
-	if err := c.testPostgreSQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
+	if err := c.testPostgreSQLBasicConnection(ctx, db); err != nil {
 		return err
 	}
 
@@ -116,7 +116,6 @@ func (c *Collector) openPostgreSQLConnection(dsn string) (*sql.DB, error) {
 func (c *Collector) testPostgreSQLBasicConnection(
 	ctx context.Context,
 	db *sql.DB,
-	endpoint string,
 ) error {
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("failed to ping PostgreSQL: %w", err)

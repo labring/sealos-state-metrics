@@ -43,7 +43,7 @@ func (c *Collector) checkMySQLConnectivity(
 	defer db.Close()
 
 	// 3. Test basic connection
-	if err := c.testMySQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
+	if err := c.testMySQLBasicConnection(ctx, db); err != nil {
 		return err
 	}
 
@@ -135,7 +135,6 @@ func (c *Collector) openMySQLConnection(dsn string) (*sql.DB, error) {
 func (c *Collector) testMySQLBasicConnection(
 	ctx context.Context,
 	db *sql.DB,
-	endpoint string,
 ) error {
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("failed to ping MySQL: %w", err)
