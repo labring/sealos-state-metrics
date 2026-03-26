@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/labring/sealos-state-metrics/pkg/collector"
-	log "github.com/sirupsen/logrus"
 )
 
 // CompositeConfigLoader implements pipe mode - multiple loaders in sequence
@@ -28,15 +30,18 @@ func NewCompositeConfigLoader(loaders ...collector.ConfigLoader) *CompositeConfi
 // LoadModuleConfig loads configuration from all loaders in sequence
 // Later loaders override values from earlier loaders
 func (c *CompositeConfigLoader) LoadModuleConfig(moduleKey string, target any) error {
-	for i, loader := range c.loaders {
+	var errs []error
+
+	for _, loader := range c.loaders {
 		if err := loader.LoadModuleConfig(moduleKey, target); err != nil {
-			log.WithFields(log.Fields{
-				"index": i,
-				"error": err,
-			}).Debug("Loader failed")
 			// Continue with next loader even if one fails
+			errs = append(errs, err)
 			continue
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to load module config %q: %w", moduleKey, errors.Join(errs...))
 	}
 
 	return nil
