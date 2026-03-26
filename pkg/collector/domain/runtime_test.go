@@ -6,6 +6,26 @@ import (
 	"time"
 )
 
+func TestNewDefaultConfig(t *testing.T) {
+	cfg := NewDefaultConfig()
+
+	if cfg.CheckTimeout != 15*time.Second {
+		t.Fatalf("CheckTimeout = %v, want 15s", cfg.CheckTimeout)
+	}
+
+	if cfg.CheckInterval != time.Minute {
+		t.Fatalf("CheckInterval = %v, want 1m", cfg.CheckInterval)
+	}
+
+	if !cfg.IncludeIPv4 {
+		t.Fatal("IncludeIPv4 = false, want true")
+	}
+
+	if !cfg.IncludeIPv6 {
+		t.Fatal("IncludeIPv6 = false, want true")
+	}
+}
+
 func TestParseDomainTarget(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -109,7 +129,7 @@ func TestParseDomainTarget(t *testing.T) {
 
 func TestNewRuntimeConfig(t *testing.T) {
 	cfg := &Config{
-		Domains: []string{
+		Domains: []any{
 			"example.com",
 			" registry.fake.local:5000 ",
 			"",
@@ -119,6 +139,8 @@ func TestNewRuntimeConfig(t *testing.T) {
 		CheckInterval:    11 * time.Minute,
 		IncludeCertCheck: true,
 		IncludeHTTPCheck: false,
+		IncludeIPv4:      true,
+		IncludeIPv6:      false,
 	}
 
 	runtimeCfg, err := newRuntimeConfig(cfg)
@@ -134,6 +156,9 @@ func TestNewRuntimeConfig(t *testing.T) {
 	if first.endpoint != "example.com" || first.target.Host != "example.com" ||
 		first.target.Port != 443 {
 		t.Fatalf("unexpected first domain: %#v", first)
+	}
+	if first.skipTLSVerify {
+		t.Fatalf("first.skipTLSVerify = true, want false")
 	}
 
 	second := runtimeCfg.domains[1]
@@ -157,5 +182,166 @@ func TestNewRuntimeConfig(t *testing.T) {
 
 	if runtimeCfg.includeHTTPCheck {
 		t.Fatal("includeHTTPCheck = true, want false")
+	}
+
+	if !runtimeCfg.includeIPv4 {
+		t.Fatal("includeIPv4 = false, want true")
+	}
+
+	if runtimeCfg.includeIPv6 {
+		t.Fatal("includeIPv6 = true, want false")
+	}
+}
+
+func TestNewRuntimeConfig_ObjectDomains(t *testing.T) {
+	cfg := &Config{
+		Domains: []any{
+			map[string]any{
+				"endpoint":      "example.com",
+				"skipTLSVerify": false,
+			},
+			map[string]any{
+				"endpoint":      "internal.example.local:8443",
+				"skipTLSVerify": true,
+			},
+		},
+		CheckTimeout:     15 * time.Second,
+		CheckInterval:    time.Minute,
+		IncludeCertCheck: true,
+		IncludeHTTPCheck: true,
+		IncludeIPv4:      true,
+		IncludeIPv6:      true,
+	}
+
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		t.Fatalf("newRuntimeConfig() returned error: %v", err)
+	}
+
+	if len(runtimeCfg.domains) != 2 {
+		t.Fatalf("expected 2 runtime domains, got %d", len(runtimeCfg.domains))
+	}
+
+	first := runtimeCfg.domains[0]
+	if first.endpoint != "example.com" || first.skipTLSVerify {
+		t.Fatalf("unexpected first domain: %#v", first)
+	}
+
+	second := runtimeCfg.domains[1]
+	if second.endpoint != "internal.example.local:8443" ||
+		second.target.Host != "internal.example.local" ||
+		second.target.Port != 8443 ||
+		!second.skipTLSVerify {
+		t.Fatalf("unexpected second domain: %#v", second)
+	}
+}
+
+func TestNewRuntimeConfig_MixedDomains(t *testing.T) {
+	cfg := &Config{
+		Domains: []any{
+			"example.com",
+			map[string]any{
+				"endpoint":      "internal.example.local:8443",
+				"skipTLSVerify": true,
+			},
+			"api.example.com",
+		},
+		CheckTimeout:     15 * time.Second,
+		CheckInterval:    time.Minute,
+		IncludeCertCheck: true,
+		IncludeHTTPCheck: true,
+		IncludeIPv4:      true,
+		IncludeIPv6:      true,
+	}
+
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		t.Fatalf("newRuntimeConfig() returned error: %v", err)
+	}
+
+	if len(runtimeCfg.domains) != 3 {
+		t.Fatalf("expected 3 runtime domains, got %d", len(runtimeCfg.domains))
+	}
+
+	if runtimeCfg.domains[0].endpoint != "example.com" || runtimeCfg.domains[0].skipTLSVerify {
+		t.Fatalf("unexpected first mixed domain: %#v", runtimeCfg.domains[0])
+	}
+
+	if runtimeCfg.domains[1].endpoint != "internal.example.local:8443" ||
+		runtimeCfg.domains[1].target.Port != 8443 ||
+		!runtimeCfg.domains[1].skipTLSVerify {
+		t.Fatalf("unexpected second mixed domain: %#v", runtimeCfg.domains[1])
+	}
+
+	if runtimeCfg.domains[2].endpoint != "api.example.com" || runtimeCfg.domains[2].skipTLSVerify {
+		t.Fatalf("unexpected third mixed domain: %#v", runtimeCfg.domains[2])
+	}
+}
+
+func TestParseMonitoredDomainMap_WeaklyTypedInput(t *testing.T) {
+	domain, err := parseMonitoredDomainMap(map[string]any{
+		"endpoint":      "internal.example.local:8443",
+		"skipTLSVerify": "true",
+	})
+	if err != nil {
+		t.Fatalf("parseMonitoredDomainMap() returned error: %v", err)
+	}
+
+	if domain.endpoint != "internal.example.local:8443" {
+		t.Fatalf("domain.endpoint = %q, want internal.example.local:8443", domain.endpoint)
+	}
+
+	if domain.target.Host != "internal.example.local" || domain.target.Port != 8443 {
+		t.Fatalf("unexpected target: %#v", domain.target)
+	}
+
+	if !domain.skipTLSVerify {
+		t.Fatal("domain.skipTLSVerify = false, want true")
+	}
+}
+
+func TestParseMonitoredDomainMap_MissingEndpoint(t *testing.T) {
+	_, err := parseMonitoredDomainMap(map[string]any{
+		"skipTLSVerify": true,
+	})
+	if err == nil {
+		t.Fatal("expected error for missing endpoint")
+	}
+}
+
+func TestNewRuntimeConfig_DomainsEnvOverridesYAML(t *testing.T) {
+	cfg := &Config{
+		Domains: []any{
+			map[string]any{
+				"endpoint":      "yaml.example.com",
+				"skipTLSVerify": true,
+			},
+		},
+		DomainsEnv:       []string{"env.example.com", "env-alt.example.com:8443"},
+		CheckTimeout:     7 * time.Second,
+		CheckInterval:    11 * time.Minute,
+		IncludeCertCheck: true,
+		IncludeHTTPCheck: true,
+		IncludeIPv4:      true,
+		IncludeIPv6:      true,
+	}
+
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		t.Fatalf("newRuntimeConfig() returned error: %v", err)
+	}
+
+	if len(runtimeCfg.domains) != 2 {
+		t.Fatalf("expected 2 runtime domains, got %d", len(runtimeCfg.domains))
+	}
+
+	if runtimeCfg.domains[0].endpoint != "env.example.com" || runtimeCfg.domains[0].skipTLSVerify {
+		t.Fatalf("unexpected first env domain: %#v", runtimeCfg.domains[0])
+	}
+
+	if runtimeCfg.domains[1].endpoint != "env-alt.example.com:8443" ||
+		runtimeCfg.domains[1].target.Port != 8443 ||
+		runtimeCfg.domains[1].skipTLSVerify {
+		t.Fatalf("unexpected second env domain: %#v", runtimeCfg.domains[1])
 	}
 }

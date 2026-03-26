@@ -113,15 +113,26 @@ collectors:
 
   # Domain collector - monitors domain health
   domain:
-    # List of domains to monitor
+    # List of domains to monitor.
+    # Supports both legacy string entries and object entries with per-domain TLS options.
     domains:
-      - example.com
-      - api.example.com
-      - www.example.com
+      - endpoint: example.com
+        skipTLSVerify: false
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
+    # Legacy format is still supported:
+    # domains:
+    #   - example.com
+    #   - api.example.com
+    #   - www.example.com
     # Check timeout for each domain
-    checkTimeout: "5s"
+    checkTimeout: "15s"
     # Check interval (how often to check all domains)
-    checkInterval: "5m"
+    checkInterval: "1m"
+    # Include IPv4 addresses resolved from DNS
+    includeIPv4: true
+    # Include IPv6 addresses resolved from DNS
+    includeIPv6: true
     # Include TLS certificate validation
     includeCertCheck: true
     # Include HTTP connectivity check

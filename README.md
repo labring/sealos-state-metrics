@@ -95,8 +95,12 @@ leaderElection:
 collectors:
   domain:
     domains:
-      - example.com
-    checkInterval: "5m"
+      - endpoint: example.com
+        skipTLSVerify: false
+    checkInterval: "1m"
+    checkTimeout: "15s"
+    includeIPv4: true
+    includeIPv6: true
 ```
 
 ### 🏗️ Production-Ready Architecture
@@ -229,9 +233,13 @@ collectors:
   domain:
     domains:
       - example.com
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
       - api.example.com
-    checkInterval: "5m"
-    checkTimeout: "5s"
+    checkInterval: "1m"
+    checkTimeout: "15s"
+    includeIPv4: true
+    includeIPv6: true
     includeCertCheck: true
     includeHTTPCheck: true
 
@@ -255,7 +263,7 @@ export LOGGING_LEVEL="debug"
 export LEADER_ELECTION_ENABLED="false"
 
 # Collector settings
-export COLLECTORS_DOMAIN_CHECK_INTERVAL="10m"
+export COLLECTORS_DOMAIN_CHECK_INTERVAL="1m"
 export COLLECTORS_DOMAIN_DOMAINS="example.com,test.com"
 export COLLECTORS_DATABASE_NAMESPACES="default,production"
 
@@ -866,7 +874,8 @@ kubernetes:
 # Adjust collector intervals
 collectors:
   domain:
-    checkInterval: "10m"  # Increase for less critical checks
+    checkInterval: "1m"   # Default
+    checkTimeout: "15s"   # Default
 
   database:
     checkInterval: "5m"   # Balance between freshness and load

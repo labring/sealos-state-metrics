@@ -104,11 +104,21 @@ The following table lists the configurable parameters of the chart and their def
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `config.domain.enabled` | Enable domain collector | `true` |
-| `config.domain.domains` | List of domains to check | `[]` |
-| `config.domain.checkTimeout` | HTTP check timeout | `5s` |
-| `config.domain.checkInterval` | Check interval | `5m` |
+| `config.domain.domains` | List of domains to check. Supports mixed string entries and object entries with `endpoint` and `skipTLSVerify` | `[]` |
+| `config.domain.checkTimeout` | HTTP and TLS check timeout | `15s` |
+| `config.domain.checkInterval` | Check interval | `1m` |
+| `config.domain.includeIPv4` | Include IPv4 addresses returned by DNS | `true` |
+| `config.domain.includeIPv6` | Include IPv6 addresses returned by DNS | `true` |
 | `config.domain.includeCertCheck` | Include certificate checks | `true` |
 | `config.domain.includeHTTPCheck` | Include HTTP checks | `true` |
+
+Notes:
+
+- String entry example: `example.com`
+- Object entry example: `{ endpoint: internal.example.local:8443, skipTLSVerify: true }`
+- `includeIPv4` and `includeIPv6` are global Domain collector switches, not per-domain options
+- `skipTLSVerify` applies to both HTTPS checks and certificate checks for that domain
+- The env var `COLLECTORS_DOMAIN_DOMAINS` only supports legacy comma-separated string entries and overrides YAML `domains`
 
 #### Node Collector
 
@@ -158,8 +168,13 @@ config:
     enabled: true
     domains:
       - example.com
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
       - test.com
-    checkInterval: 10m
+    checkTimeout: 15s
+    checkInterval: 1m
+    includeIPv4: true
+    includeIPv6: true
 
   leaderElection:
     enabled: true

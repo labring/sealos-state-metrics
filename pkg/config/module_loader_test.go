@@ -25,6 +25,14 @@ type NestedConfig struct {
 	Port  int    `mapstructure:"port"  yaml:"port"`
 }
 
+type DomainModuleTestConfig struct {
+	Domains      []any         `yaml:"domains"`
+	DomainsEnv   []string      `yaml:"-" env:"DOMAINS" envSeparator:","`
+	CheckTimeout time.Duration `yaml:"checkTimeout"`
+	IncludeIPv4  bool          `yaml:"includeIPv4" env:"INCLUDE_IPV4"`
+	IncludeIPv6  bool          `yaml:"includeIPv6" env:"INCLUDE_IPV6"`
+}
+
 func TestModuleConfigLoader_BasicLoad(t *testing.T) {
 	// Create temporary YAML config file
 	yamlContent := `
@@ -222,6 +230,138 @@ collectors:
 	// Int 456 should convert to string "456"
 	if config.Name != "456" {
 		t.Errorf("Expected Name=456 (from int), got %s", config.Name)
+	}
+}
+
+func TestModuleConfigLoader_DomainObjectList(t *testing.T) {
+	yamlContent := `
+collectors:
+  domain:
+    domains:
+      - endpoint: example.com
+        skipTLSVerify: false
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
+    checkTimeout: "15s"
+`
+
+	tmpFile := createTempYAML(t, yamlContent)
+	loader := NewModuleConfigLoader(tmpFile, WithModuleDecodeHook(
+		mapstructure.StringToTimeDurationHookFunc(),
+	))
+
+	cfg := &DomainModuleTestConfig{}
+	err := loader.LoadModuleConfig("collectors.domain", cfg)
+	if err != nil {
+		t.Fatalf("LoadModuleConfig failed: %v", err)
+	}
+
+	if len(cfg.Domains) != 2 {
+		t.Fatalf("expected 2 domains, got %d", len(cfg.Domains))
+	}
+
+	first, ok := cfg.Domains[0].(map[string]any)
+	if !ok {
+		t.Fatalf("first domain has unexpected type %T", cfg.Domains[0])
+	}
+
+	if first["endpoint"] != "example.com" {
+		t.Fatalf("first endpoint = %v, want example.com", first["endpoint"])
+	}
+
+	if first["skipTLSVerify"] != false {
+		t.Fatalf("first skipTLSVerify = %v, want false", first["skipTLSVerify"])
+	}
+
+	second, ok := cfg.Domains[1].(map[string]any)
+	if !ok {
+		t.Fatalf("second domain has unexpected type %T", cfg.Domains[1])
+	}
+
+	if second["endpoint"] != "internal.example.local:8443" {
+		t.Fatalf("second endpoint = %v, want internal.example.local:8443", second["endpoint"])
+	}
+
+	if second["skipTLSVerify"] != true {
+		t.Fatalf("second skipTLSVerify = %v, want true", second["skipTLSVerify"])
+	}
+
+	if cfg.CheckTimeout != 15*time.Second {
+		t.Fatalf("checkTimeout = %v, want 15s", cfg.CheckTimeout)
+	}
+}
+
+func TestModuleConfigLoader_DomainMixedList(t *testing.T) {
+	yamlContent := `
+collectors:
+  domain:
+    domains:
+      - example.com
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
+      - api.example.com
+`
+
+	tmpFile := createTempYAML(t, yamlContent)
+	loader := NewModuleConfigLoader(tmpFile)
+
+	cfg := &DomainModuleTestConfig{}
+	err := loader.LoadModuleConfig("collectors.domain", cfg)
+	if err != nil {
+		t.Fatalf("LoadModuleConfig failed: %v", err)
+	}
+
+	if len(cfg.Domains) != 3 {
+		t.Fatalf("expected 3 domains, got %d", len(cfg.Domains))
+	}
+
+	first, ok := cfg.Domains[0].(string)
+	if !ok || first != "example.com" {
+		t.Fatalf("unexpected first domain entry: %#v", cfg.Domains[0])
+	}
+
+	second, ok := cfg.Domains[1].(map[string]any)
+	if !ok {
+		t.Fatalf("second domain has unexpected type %T", cfg.Domains[1])
+	}
+
+	if second["endpoint"] != "internal.example.local:8443" || second["skipTLSVerify"] != true {
+		t.Fatalf("unexpected second domain entry: %#v", second)
+	}
+
+	third, ok := cfg.Domains[2].(string)
+	if !ok || third != "api.example.com" {
+		t.Fatalf("unexpected third domain entry: %#v", cfg.Domains[2])
+	}
+}
+
+func TestEnvConfigLoader_DomainStringListCompatibility(t *testing.T) {
+	loader := NewEnvConfigLoader(WithEnvironment(map[string]string{
+		"COLLECTORS_DOMAIN_DOMAINS":      "example.com,api.example.com,www.example.com",
+		"COLLECTORS_DOMAIN_INCLUDE_IPV4": "true",
+		"COLLECTORS_DOMAIN_INCLUDE_IPV6": "false",
+	}))
+
+	cfg := &DomainModuleTestConfig{}
+	err := loader.LoadModuleConfig("collectors.domain", cfg)
+	if err != nil {
+		t.Fatalf("LoadModuleConfig failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(cfg.DomainsEnv, []string{
+		"example.com",
+		"api.example.com",
+		"www.example.com",
+	}) {
+		t.Fatalf("DomainsEnv = %#v, want 3 env domains", cfg.DomainsEnv)
+	}
+
+	if !cfg.IncludeIPv4 {
+		t.Fatal("IncludeIPv4 = false, want true")
+	}
+
+	if cfg.IncludeIPv6 {
+		t.Fatal("IncludeIPv6 = true, want false")
 	}
 }
 
