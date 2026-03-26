@@ -575,8 +575,9 @@ func (c *Collector) checkDatabaseConnectivity(
 				"namespace": namespace,
 				"database":  dbName,
 				"type":      dbType,
-				"error":     preflightErr.Type,
-			}).Debug("Database preflight check failed (fast-fail)")
+				"errorType": preflightErr.Type,
+				"error":     preflightErr.Message,
+			}).Warn("Database preflight check failed (fast-fail)")
 
 			return status
 		}
@@ -606,10 +607,11 @@ func (c *Collector) checkDatabaseConnectivity(
 		status.Connected = false
 		status.Error = err.Error()
 		c.logger.WithFields(log.Fields{
-			"namespace": namespace,
-			"database":  dbName,
-			"type":      dbType,
-		}).WithError(err).Debug("Database connectivity check failed")
+			"namespace":     namespace,
+			"database":      dbName,
+			"type":          dbType,
+			"response_time": status.ResponseTime,
+		}).WithError(err).Warn("Database connectivity check failed")
 	} else {
 		status.Connected = true
 		status.Error = ""

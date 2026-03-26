@@ -94,10 +94,15 @@ func (dc *DomainChecker) CheckIPs(
 	// First, get the IPs for the domain
 	var ips []string
 	if dc.checkDNS || dc.checkHTTP {
-		dnsResult := util.CheckDNSWithFilter(ctx, domain.target.Host, dc.timeout, util.IPFamilyFilter{
-			IncludeIPv4: dc.includeIPv4,
-			IncludeIPv6: dc.includeIPv6,
-		})
+		dnsResult := util.CheckDNSWithFilter(
+			ctx,
+			domain.target.Host,
+			dc.timeout,
+			util.IPFamilyFilter{
+				IncludeIPv4: dc.includeIPv4,
+				IncludeIPv6: dc.includeIPv6,
+			},
+		)
 		if !dnsResult.Success {
 			logger.WithFields(log.Fields{
 				"domain": domain.endpoint,
@@ -174,6 +179,7 @@ func (dc *DomainChecker) CheckIPs(
 		}
 	} else {
 		indexCh := make(chan int)
+
 		var wg sync.WaitGroup
 		for range workerCount {
 			wg.Go(func() {
@@ -286,6 +292,7 @@ func (dc *DomainChecker) runIPChecks(
 	}
 
 	health.CertChecked = true
+
 	certInfo, certErr := util.GetTLSCertWithIP(
 		domain.target.Host,
 		domain.target.Port,

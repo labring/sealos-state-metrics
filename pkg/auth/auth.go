@@ -251,7 +251,6 @@ func (a *Authenticator) authenticateToken(
 			)
 			if err != nil {
 				lastErr = err
-				a.logger.WithError(err).Debug("TokenReview API call failed, retrying...")
 				return false, nil // Retry
 			}
 
@@ -365,7 +364,6 @@ func (a *Authenticator) authorizeRequest(
 			)
 			if err != nil {
 				lastErr = err
-				a.logger.WithError(err).Debug("SubjectAccessReview API call failed, retrying...")
 				return false, nil // Retry
 			}
 

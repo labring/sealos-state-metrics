@@ -39,11 +39,11 @@ func (c *Collector) checkRedisConnectivity(
 	defer client.Close()
 
 	// 3. Test basic connection
-	if err := c.testRedisBasicConnection(ctx, client, connInfo.Endpoint); err != nil {
+	if err := c.testRedisBasicConnection(ctx, client); err != nil {
 		return err
 	}
 
-	c.logger.Infof("Redis connectivity test passed: %s", connInfo.Endpoint)
+	c.logger.Debugf("Redis connectivity test passed: %s", connInfo.Endpoint)
 
 	return nil
 }
@@ -56,7 +56,6 @@ func (c *Collector) parseRedisConnectionInfo(
 	// Extract password
 	password, err := decodeSecret(secret.Data, "password")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse password")
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
@@ -97,10 +96,8 @@ func (c *Collector) openRedisConnection(connInfo *RedisConnectionInfo) (*redis.C
 func (c *Collector) testRedisBasicConnection(
 	ctx context.Context,
 	client *redis.Client,
-	endpoint string,
 ) error {
 	if err := client.Ping(ctx).Err(); err != nil {
-		c.logger.WithError(err).Errorf("Redis Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping Redis: %w", err)
 	}
 

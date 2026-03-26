@@ -285,7 +285,7 @@ func (c *Collector) handleSlowPullTimer(
 		c.logger.WithError(err).WithFields(log.Fields{
 			"pod":       namespace + "/" + podName,
 			"container": containerName,
-		}).Debug("Failed to get pod for slow pull check")
+		}).Warn("Failed to get pod for slow pull check")
 
 		return
 	}

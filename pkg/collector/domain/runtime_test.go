@@ -157,6 +157,7 @@ func TestNewRuntimeConfig(t *testing.T) {
 		first.target.Port != 443 {
 		t.Fatalf("unexpected first domain: %#v", first)
 	}
+
 	if first.skipTLSVerify {
 		t.Fatalf("first.skipTLSVerify = true, want false")
 	}

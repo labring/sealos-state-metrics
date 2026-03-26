@@ -43,11 +43,11 @@ func (c *Collector) checkMySQLConnectivity(
 	defer db.Close()
 
 	// 3. Test basic connection
-	if err := c.testMySQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
+	if err := c.testMySQLBasicConnection(ctx, db); err != nil {
 		return err
 	}
 
-	c.logger.Infof("MySQL connectivity test passed: %s", connInfo.Endpoint)
+	c.logger.Debugf("MySQL connectivity test passed: %s", connInfo.Endpoint)
 
 	return nil
 }
@@ -59,21 +59,18 @@ func (c *Collector) parseMySQLConnectionInfo(secret *corev1.Secret) (*MySQLConne
 	// Extract username
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse username")
 		return nil, fmt.Errorf("failed to get username: %w", err)
 	}
 
 	// Extract password
 	password, err := decodeSecret(secret.Data, "password")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse password")
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
 	// Extract endpoint
 	endpoint, err := decodeSecret(secret.Data, "endpoint")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse endpoint")
 		return nil, fmt.Errorf("failed to get endpoint: %w", err)
 	}
 
@@ -123,7 +120,6 @@ func (c *Collector) buildFullEndpoint(host, port, namespace string) string {
 func (c *Collector) openMySQLConnection(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to open MySQL connection")
 		return nil, err
 	}
 
@@ -139,10 +135,8 @@ func (c *Collector) openMySQLConnection(dsn string) (*sql.DB, error) {
 func (c *Collector) testMySQLBasicConnection(
 	ctx context.Context,
 	db *sql.DB,
-	endpoint string,
 ) error {
 	if err := db.PingContext(ctx); err != nil {
-		c.logger.WithError(err).Errorf("MySQL Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MySQL: %w", err)
 	}
 

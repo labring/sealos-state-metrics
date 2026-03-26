@@ -114,6 +114,7 @@ func parseMonitoredDomainString(value string) (monitoredDomain, error) {
 
 func parseMonitoredDomainMap(value map[string]any) (monitoredDomain, error) {
 	var cfg monitoredDomainConfig
+
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		TagName:          "mapstructure",
 		Result:           &cfg,

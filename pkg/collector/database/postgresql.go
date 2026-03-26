@@ -41,11 +41,11 @@ func (c *Collector) checkPostgreSQLConnectivity(
 	defer db.Close()
 
 	// 3. Test basic connection
-	if err := c.testPostgreSQLBasicConnection(ctx, db, connInfo.Endpoint); err != nil {
+	if err := c.testPostgreSQLBasicConnection(ctx, db); err != nil {
 		return err
 	}
 
-	c.logger.Infof("PostgreSQL connectivity test passed: %s", connInfo.Endpoint)
+	c.logger.Debugf("PostgreSQL connectivity test passed: %s", connInfo.Endpoint)
 
 	return nil
 }
@@ -58,28 +58,24 @@ func (c *Collector) parsePostgreSQLConnectionInfo(
 	// Extract username
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse username")
 		return nil, fmt.Errorf("failed to get username: %w", err)
 	}
 
 	// Extract password
 	password, err := decodeSecret(secret.Data, "password")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse password")
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
 	// Extract host
 	host, err := decodeSecret(secret.Data, "host")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse host")
 		return nil, fmt.Errorf("failed to get host: %w", err)
 	}
 
 	// Extract port
 	port, err := decodeSecret(secret.Data, "port")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse port")
 		return nil, fmt.Errorf("failed to get port: %w", err)
 	}
 
@@ -105,7 +101,6 @@ func (c *Collector) parsePostgreSQLConnectionInfo(
 func (c *Collector) openPostgreSQLConnection(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to open PostgreSQL connection")
 		return nil, err
 	}
 
@@ -121,10 +116,8 @@ func (c *Collector) openPostgreSQLConnection(dsn string) (*sql.DB, error) {
 func (c *Collector) testPostgreSQLBasicConnection(
 	ctx context.Context,
 	db *sql.DB,
-	endpoint string,
 ) error {
 	if err := db.PingContext(ctx); err != nil {
-		c.logger.WithError(err).Errorf("PostgreSQL Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping PostgreSQL: %w", err)
 	}
 

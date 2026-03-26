@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/labring/sealos-state-metrics/pkg/collector"
-	log "github.com/sirupsen/logrus"
 )
 
 // WrapConfigLoader wraps multiple config loaders in a chain
@@ -29,15 +31,18 @@ func (w *WrapConfigLoader) Add(loader collector.ConfigLoader) *WrapConfigLoader 
 // LoadModuleConfig loads configuration from all loaders in the chain
 // Each loader can override values from previous loaders
 func (w *WrapConfigLoader) LoadModuleConfig(moduleKey string, target any) error {
-	for i, loader := range w.loaders {
+	var errs []error
+
+	for _, loader := range w.loaders {
 		if err := loader.LoadModuleConfig(moduleKey, target); err != nil {
-			log.WithFields(log.Fields{
-				"index": i,
-				"error": err,
-			}).Debug("Loader failed in chain")
 			// Continue with next loader even if one fails
+			errs = append(errs, err)
 			continue
 		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to load module config %q: %w", moduleKey, errors.Join(errs...))
 	}
 
 	return nil

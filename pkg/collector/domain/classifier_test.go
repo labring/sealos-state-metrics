@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests exercise package internals alongside exported classifier behavior.
 package domain
 
 import "testing"

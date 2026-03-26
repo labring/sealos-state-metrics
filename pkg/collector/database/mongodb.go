@@ -46,11 +46,11 @@ func (c *Collector) checkMongoDBConnectivity(
 	}()
 
 	// 3. Test basic connection
-	if err := c.testMongoDBBasicConnection(ctx, client, connInfo.Endpoint); err != nil {
+	if err := c.testMongoDBBasicConnection(ctx, client); err != nil {
 		return err
 	}
 
-	c.logger.Infof("MongoDB connectivity test passed: %s", connInfo.Endpoint)
+	c.logger.Debugf("MongoDB connectivity test passed: %s", connInfo.Endpoint)
 
 	return nil
 }
@@ -63,14 +63,12 @@ func (c *Collector) parseMongoDBConnectionInfo(
 	// Extract username
 	username, err := decodeSecret(secret.Data, "username")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse username")
 		return nil, fmt.Errorf("failed to get username: %w", err)
 	}
 
 	// Extract password
 	password, err := decodeSecret(secret.Data, "password")
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to parse password")
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
@@ -107,7 +105,6 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		c.logger.WithError(err).Error("Failed to open MongoDB connection")
 		return nil, err
 	}
 
@@ -118,10 +115,8 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 func (c *Collector) testMongoDBBasicConnection(
 	ctx context.Context,
 	client *mongo.Client,
-	endpoint string,
 ) error {
 	if err := client.Ping(ctx, nil); err != nil {
-		c.logger.WithError(err).Errorf("MongoDB Ping failed: %s", endpoint)
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 

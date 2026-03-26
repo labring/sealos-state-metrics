@@ -27,10 +27,10 @@ type NestedConfig struct {
 
 type DomainModuleTestConfig struct {
 	Domains      []any         `yaml:"domains"`
-	DomainsEnv   []string      `yaml:"-" env:"DOMAINS" envSeparator:","`
+	DomainsEnv   []string      `yaml:"-"            env:"DOMAINS"      envSeparator:","`
 	CheckTimeout time.Duration `yaml:"checkTimeout"`
-	IncludeIPv4  bool          `yaml:"includeIPv4" env:"INCLUDE_IPV4"`
-	IncludeIPv6  bool          `yaml:"includeIPv6" env:"INCLUDE_IPV6"`
+	IncludeIPv4  bool          `yaml:"includeIPv4"  env:"INCLUDE_IPV4"`
+	IncludeIPv6  bool          `yaml:"includeIPv6"  env:"INCLUDE_IPV6"`
 }
 
 func TestModuleConfigLoader_BasicLoad(t *testing.T) {
@@ -251,6 +251,7 @@ collectors:
 	))
 
 	cfg := &DomainModuleTestConfig{}
+
 	err := loader.LoadModuleConfig("collectors.domain", cfg)
 	if err != nil {
 		t.Fatalf("LoadModuleConfig failed: %v", err)
@@ -306,6 +307,7 @@ collectors:
 	loader := NewModuleConfigLoader(tmpFile)
 
 	cfg := &DomainModuleTestConfig{}
+
 	err := loader.LoadModuleConfig("collectors.domain", cfg)
 	if err != nil {
 		t.Fatalf("LoadModuleConfig failed: %v", err)
@@ -343,6 +345,7 @@ func TestEnvConfigLoader_DomainStringListCompatibility(t *testing.T) {
 	}))
 
 	cfg := &DomainModuleTestConfig{}
+
 	err := loader.LoadModuleConfig("collectors.domain", cfg)
 	if err != nil {
 		t.Fatalf("LoadModuleConfig failed: %v", err)
