@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+type IPFamilyFilter struct {
+	IncludeIPv4 bool
+	IncludeIPv6 bool
+}
+
 // DNSCheckResult contains the result of a DNS check
 type DNSCheckResult struct {
 	Success bool
@@ -16,6 +21,19 @@ type DNSCheckResult struct {
 
 // CheckDNS performs a DNS lookup
 func CheckDNS(ctx context.Context, domain string, timeout time.Duration) *DNSCheckResult {
+	return CheckDNSWithFilter(ctx, domain, timeout, IPFamilyFilter{
+		IncludeIPv4: true,
+		IncludeIPv6: true,
+	})
+}
+
+// CheckDNSWithFilter performs a DNS lookup and filters IPs by family.
+func CheckDNSWithFilter(
+	ctx context.Context,
+	domain string,
+	timeout time.Duration,
+	filter IPFamilyFilter,
+) *DNSCheckResult {
 	resolver := &net.Resolver{}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -29,10 +47,38 @@ func CheckDNS(ctx context.Context, domain string, timeout time.Duration) *DNSChe
 		}
 	}
 
+	filteredIPs := filterIPsByFamily(ips, filter)
+
 	return &DNSCheckResult{
-		Success: len(ips) > 0,
-		IPs:     ips,
+		Success: len(filteredIPs) > 0,
+		IPs:     filteredIPs,
 	}
+}
+
+func filterIPsByFamily(ips []string, filter IPFamilyFilter) []string {
+	if filter.IncludeIPv4 && filter.IncludeIPv6 {
+		return ips
+	}
+
+	filtered := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
+			continue
+		}
+
+		isIPv4 := parsedIP.To4() != nil
+		if isIPv4 && filter.IncludeIPv4 {
+			filtered = append(filtered, ip)
+			continue
+		}
+
+		if !isIPv4 && filter.IncludeIPv6 {
+			filtered = append(filtered, ip)
+		}
+	}
+
+	return filtered
 }
 
 // CheckIPReachability checks if an IP is reachable

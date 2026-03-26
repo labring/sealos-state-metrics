@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 const defaultHTTPSPort = 443
@@ -18,8 +20,14 @@ type DomainTarget struct {
 }
 
 type monitoredDomain struct {
-	endpoint string
-	target   DomainTarget
+	endpoint      string
+	target        DomainTarget
+	skipTLSVerify bool
+}
+
+type monitoredDomainConfig struct {
+	Endpoint      string `mapstructure:"endpoint"`
+	SkipTLSVerify bool   `mapstructure:"skipTLSVerify"`
 }
 
 type runtimeConfig struct {
@@ -28,10 +36,20 @@ type runtimeConfig struct {
 	checkInterval    time.Duration
 	includeCertCheck bool
 	includeHTTPCheck bool
+	includeIPv4      bool
+	includeIPv6      bool
 }
 
 func newRuntimeConfig(cfg *Config) (*runtimeConfig, error) {
-	domains, err := parseMonitoredDomains(cfg.Domains)
+	domainItems := cfg.Domains
+	if len(cfg.DomainsEnv) > 0 {
+		domainItems = make([]any, 0, len(cfg.DomainsEnv))
+		for _, value := range cfg.DomainsEnv {
+			domainItems = append(domainItems, value)
+		}
+	}
+
+	domains, err := parseMonitoredDomains(domainItems)
 	if err != nil {
 		return nil, err
 	}
@@ -42,10 +60,12 @@ func newRuntimeConfig(cfg *Config) (*runtimeConfig, error) {
 		checkInterval:    cfg.CheckInterval,
 		includeCertCheck: cfg.IncludeCertCheck,
 		includeHTTPCheck: cfg.IncludeHTTPCheck,
+		includeIPv4:      cfg.IncludeIPv4,
+		includeIPv6:      cfg.IncludeIPv6,
 	}, nil
 }
 
-func parseMonitoredDomains(values []string) ([]monitoredDomain, error) {
+func parseMonitoredDomains(values []any) ([]monitoredDomain, error) {
 	domains := make([]monitoredDomain, 0, len(values))
 
 	for _, value := range values {
@@ -64,7 +84,18 @@ func parseMonitoredDomains(values []string) ([]monitoredDomain, error) {
 	return domains, nil
 }
 
-func parseMonitoredDomain(value string) (monitoredDomain, error) {
+func parseMonitoredDomain(value any) (monitoredDomain, error) {
+	switch v := value.(type) {
+	case string:
+		return parseMonitoredDomainString(v)
+	case map[string]any:
+		return parseMonitoredDomainMap(v)
+	default:
+		return monitoredDomain{}, fmt.Errorf("invalid domain entry type %T", value)
+	}
+}
+
+func parseMonitoredDomainString(value string) (monitoredDomain, error) {
 	endpoint := strings.TrimSpace(value)
 	if endpoint == "" {
 		return monitoredDomain{}, nil
@@ -79,6 +110,39 @@ func parseMonitoredDomain(value string) (monitoredDomain, error) {
 		endpoint: endpoint,
 		target:   target,
 	}, nil
+}
+
+func parseMonitoredDomainMap(value map[string]any) (monitoredDomain, error) {
+	var cfg monitoredDomainConfig
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		TagName:          "mapstructure",
+		Result:           &cfg,
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return monitoredDomain{}, fmt.Errorf("failed to create domain entry decoder: %w", err)
+	}
+
+	if err := decoder.Decode(value); err != nil {
+		return monitoredDomain{}, fmt.Errorf("invalid domain entry %v: %w", value, err)
+	}
+
+	if strings.TrimSpace(cfg.Endpoint) == "" {
+		return monitoredDomain{}, errors.New("invalid domain entry: endpoint is required")
+	}
+
+	domain, err := parseMonitoredDomainString(cfg.Endpoint)
+	if err != nil {
+		return monitoredDomain{}, err
+	}
+
+	if domain.endpoint == "" {
+		return monitoredDomain{}, nil
+	}
+
+	domain.skipTLSVerify = cfg.SkipTLSVerify
+
+	return domain, nil
 }
 
 func parseDomainTarget(value string) (DomainTarget, error) {

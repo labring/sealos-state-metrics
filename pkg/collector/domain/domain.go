@@ -24,6 +24,7 @@ type Collector struct {
 
 	// Metrics
 	domainHealth       *prometheus.Desc
+	domainDNSStatus    *prometheus.Desc
 	domainStatus       *prometheus.Desc
 	domainCertExpiry   *prometheus.Desc
 	domainResponseTime *prometheus.Desc
@@ -35,6 +36,12 @@ func (c *Collector) initMetrics(namespace string) {
 		prometheus.BuildFQName(namespace, "domain", "health"),
 		"Domain-level health metrics",
 		[]string{"domain", "type"},
+		nil,
+	)
+	c.domainDNSStatus = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "domain", "dns_status"),
+		"Domain DNS status (1=ok, 0=error)",
+		[]string{"domain", "error_type"},
 		nil,
 	)
 	c.domainStatus = prometheus.NewDesc(
@@ -58,6 +65,7 @@ func (c *Collector) initMetrics(namespace string) {
 
 	// Register descriptors
 	c.MustRegisterDesc(c.domainHealth)
+	c.MustRegisterDesc(c.domainDNSStatus)
 	c.MustRegisterDesc(c.domainStatus)
 	c.MustRegisterDesc(c.domainCertExpiry)
 	c.MustRegisterDesc(c.domainResponseTime)
@@ -188,10 +196,28 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 		)
 	}
 
+	// Emit domain-level DNS status once per domain.
+	emittedDNS := make(map[string]struct{}, len(c.ips))
+	for _, ipHealth := range c.ips {
+		if ipHealth.DNSChecked {
+			if _, exists := emittedDNS[ipHealth.Domain]; !exists {
+				emittedDNS[ipHealth.Domain] = struct{}{}
+
+				ch <- prometheus.MustNewConstMetric(
+					c.domainDNSStatus,
+					prometheus.GaugeValue,
+					boolToFloat64(ipHealth.DNSOk),
+					ipHealth.Domain,
+					string(ipHealth.DNSErrorType),
+				)
+			}
+		}
+	}
+
 	// Emit IP-level metrics
 	for _, ipHealth := range c.ips {
 		// HTTP status
-		if c.runtime.includeHTTPCheck {
+		if c.runtime.includeHTTPCheck && ipHealth.HTTPChecked {
 			ch <- prometheus.MustNewConstMetric(
 				c.domainStatus,
 				prometheus.GaugeValue,
@@ -214,7 +240,7 @@ func (c *Collector) collect(ch chan<- prometheus.Metric) {
 		}
 
 		// Certificate status
-		if c.runtime.includeCertCheck {
+		if c.runtime.includeCertCheck && ipHealth.CertChecked {
 			ch <- prometheus.MustNewConstMetric(
 				c.domainStatus,
 				prometheus.GaugeValue,

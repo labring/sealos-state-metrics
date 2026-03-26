@@ -48,6 +48,8 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		runtimeCfg.includeHTTPCheck,
 		true, // checkDNS is always true as we need IPs
 		runtimeCfg.includeCertCheck,
+		runtimeCfg.includeIPv4,
+		runtimeCfg.includeIPv6,
 	)
 
 	c.initMetrics(factoryCtx.MetricsNamespace)

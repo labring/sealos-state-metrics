@@ -134,8 +134,10 @@ identity: ""
 collectors:
   domain:
     domains: []
-    checkTimeout: "5s"
-    checkInterval: "5m"
+    checkTimeout: "15s"
+    checkInterval: "1m"
+    includeIPv4: true
+    includeIPv6: true
     includeCertCheck: true
     includeHTTPCheck: true
 

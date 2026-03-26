@@ -77,6 +77,7 @@ func CheckHTTPWithIP(
 	host string,
 	port int,
 	ip string,
+	skipTLSVerify bool,
 	timeout time.Duration,
 ) *HTTPCheckResult {
 	if err := validateMonitoringTarget(host, port, ip); err != nil {
@@ -97,7 +98,7 @@ func CheckHTTPWithIP(
 				}).DialContext(ctx, network, net.JoinHostPort(ip, strconv.Itoa(port)))
 			},
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false,
+				InsecureSkipVerify: skipTLSVerify,
 				MinVersion:         tls.VersionTLS12,
 				ServerName:         host,
 			},
@@ -144,11 +145,32 @@ func CheckHTTPWithIP(
 	}
 }
 
-// GetTLSCert retrieves the TLS certificate from a domain
-func GetTLSCert(host string, port int, timeout time.Duration) (*CertInfo, error) {
+// GetTLSCertWithIP retrieves the TLS certificate by dialing a specific IP
+// while preserving the original host as SNI.
+func GetTLSCertWithIP(
+	host string,
+	port int,
+	ip string,
+	skipTLSVerify bool,
+	timeout time.Duration,
+) (*CertInfo, error) {
+	if err := validateMonitoringTarget(host, port, ip); err != nil {
+		return nil, fmt.Errorf("invalid request target: %w", err)
+	}
+
+	return getTLSCert(host, port, ip, skipTLSVerify, timeout)
+}
+
+func getTLSCert(
+	host string,
+	port int,
+	dialHost string,
+	skipTLSVerify bool,
+	timeout time.Duration,
+) (*CertInfo, error) {
 	dialer := &tls.Dialer{
 		Config: &tls.Config{
-			InsecureSkipVerify: false,
+			InsecureSkipVerify: skipTLSVerify,
 			MinVersion:         tls.VersionTLS12,
 			ServerName:         host,
 		},
@@ -157,7 +179,7 @@ func GetTLSCert(host string, port int, timeout time.Duration) (*CertInfo, error)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(dialHost, strconv.Itoa(port)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
