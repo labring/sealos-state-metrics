@@ -502,16 +502,8 @@ func (c *Collector) calculateStatistics(statusMap map[string]*DatabaseStatus) st
 // isCredentialSecret checks if the secret is a credential secret for the database type
 func (c *Collector) isCredentialSecret(secret *corev1.Secret, dbType DatabaseType) bool {
 	switch dbType {
-	case DatabaseTypeMySQL, DatabaseTypePostgreSQL:
+	case DatabaseTypeMySQL, DatabaseTypePostgreSQL, DatabaseTypeMongoDB, DatabaseTypeRedis:
 		suffix := "-conn-credential"
-		return len(secret.Name) > len(suffix) &&
-			secret.Name[len(secret.Name)-len(suffix):] == suffix
-	case DatabaseTypeMongoDB:
-		suffix := "-mongodb-account-root"
-		return len(secret.Name) > len(suffix) &&
-			secret.Name[len(secret.Name)-len(suffix):] == suffix
-	case DatabaseTypeRedis:
-		suffix := "-redis-account-default"
 		return len(secret.Name) > len(suffix) &&
 			secret.Name[len(secret.Name)-len(suffix):] == suffix
 	}
@@ -522,20 +514,11 @@ func (c *Collector) isCredentialSecret(secret *corev1.Secret, dbType DatabaseTyp
 // extractDatabaseName extracts the database name from the secret name
 func (c *Collector) extractDatabaseName(secret *corev1.Secret, dbType DatabaseType) string {
 	switch dbType {
-	case DatabaseTypeMySQL, DatabaseTypePostgreSQL:
+	case DatabaseTypeMySQL, DatabaseTypePostgreSQL, DatabaseTypeMongoDB, DatabaseTypeRedis:
 		// Remove "-conn-credential" suffix
-		if len(secret.Name) > len("-conn-credential") {
-			return secret.Name[:len(secret.Name)-len("-conn-credential")]
-		}
-	case DatabaseTypeMongoDB:
-		// Remove "-mongodb-account-root" suffix
-		if len(secret.Name) > len("-mongodb-account-root") {
-			return secret.Name[:len(secret.Name)-len("-mongodb-account-root")]
-		}
-	case DatabaseTypeRedis:
-		// Remove "-redis-account-default" suffix
-		if len(secret.Name) > len("-redis-account-default") {
-			return secret.Name[:len(secret.Name)-len("-redis-account-default")]
+		suffix := "-conn-credential"
+		if len(secret.Name) > len(suffix) {
+			return secret.Name[:len(secret.Name)-len(suffix)]
 		}
 	}
 
