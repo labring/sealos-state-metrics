@@ -40,6 +40,7 @@ func (c *Collector) checkMongoDBConnectivity(
 	}
 
 	defer func() {
+		ctx = context.Background()
 		if err := client.Disconnect(ctx); err != nil {
 			c.logger.WithError(err).Warn("Failed to disconnect from MongoDB")
 		}
@@ -100,7 +101,8 @@ func (c *Collector) openMongoDBConnection(ctx context.Context, uri string) (*mon
 		ApplyURI(uri).
 		SetConnectTimeout(c.config.CheckTimeout).
 		SetServerSelectionTimeout(c.config.CheckTimeout).
-		SetSocketTimeout(c.config.CheckTimeout)
+		SetSocketTimeout(c.config.CheckTimeout).
+		SetMaxPoolSize(1)
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(ctx, clientOptions)

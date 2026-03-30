@@ -87,6 +87,8 @@ func (c *Collector) openRedisConnection(connInfo *RedisConnectionInfo) (*redis.C
 		DialTimeout:  c.config.CheckTimeout,
 		ReadTimeout:  c.config.CheckTimeout,
 		WriteTimeout: c.config.CheckTimeout,
+		PoolSize:     1,
+		MinIdleConns: 0,
 	})
 
 	return client, nil

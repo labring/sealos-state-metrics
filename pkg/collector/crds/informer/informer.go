@@ -177,6 +177,9 @@ func (i *Informer) GetConfig() *InformerConfig {
 	return i.config
 }
 
+type crd struct {
+}
+
 // registerEventHandlers registers event handlers.
 func (i *Informer) registerEventHandlers() error {
 	_, err := i.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
