@@ -352,9 +352,9 @@ func (sc *SecretCache) matchesType(secret *corev1.Secret, dbType DatabaseType) b
 	case DatabaseTypePostgreSQL:
 		return labels["app.kubernetes.io/name"] == "postgresql"
 	case DatabaseTypeMongoDB:
-		return labels["apps.kubeblocks.io/component-name"] == "mongodb"
+		return labels["apps.kubeblocks.io/cluster-type"] == "mongodb"
 	case DatabaseTypeRedis:
-		return labels["apps.kubeblocks.io/component-name"] == "redis"
+		return labels["apps.kubeblocks.io/cluster-type"] == "redis"
 	default:
 		return false
 	}
