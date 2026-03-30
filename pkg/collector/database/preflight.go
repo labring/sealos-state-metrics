@@ -183,9 +183,7 @@ func (pc *PreflightChecker) isServiceHost(host, namespace string) bool {
 	// - servicename.namespace.svc
 	// - servicename.namespace
 	// - servicename (if in same namespace)
-	return strings.Contains(host, ".svc.cluster.local") ||
-		strings.Contains(host, ".svc") ||
-		(strings.Contains(host, ".") && strings.Contains(host, namespace))
+	return strings.Contains(host, ".svc.cluster.local") || strings.Contains(host, ".svc")
 }
 
 // extractServiceName extracts service name from service hostname
