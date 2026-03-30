@@ -253,8 +253,8 @@ When `namespaces` is empty or not specified:
 Secret label patterns monitored:
 - MySQL: `apps.kubeblocks.io/cluster-type=mysql`
 - PostgreSQL: `app.kubernetes.io/name=postgresql`
-- MongoDB: `apps.kubeblocks.io/component-name=mongodb`
-- Redis: `apps.kubeblocks.io/component-name=redis`
+- MongoDB: `apps.kubeblocks.io/cluster-type=mongodb`
+- Redis: `apps.kubeblocks.io/cluster-type=redis`
 
 #### Specific-Namespace Mode
 When `namespaces` is configured with specific values:

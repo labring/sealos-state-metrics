@@ -24,9 +24,8 @@ var cachedSecretDataKeys = map[string]struct{}{
 }
 
 var cachedSecretLabelKeys = map[string]struct{}{
-	"apps.kubeblocks.io/cluster-type":   {},
-	"app.kubernetes.io/name":            {},
-	"apps.kubeblocks.io/component-name": {},
+	"apps.kubeblocks.io/cluster-type": {},
+	"app.kubernetes.io/name":          {},
 }
 
 // SecretCache manages a cache of database secrets using standard informers
