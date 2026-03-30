@@ -58,8 +58,8 @@ func (sc *SecretCache) Start(ctx context.Context, namespaces []string) error {
 	dbTypeSelectors := map[DatabaseType]string{
 		DatabaseTypeMySQL:      "apps.kubeblocks.io/cluster-type=mysql",
 		DatabaseTypePostgreSQL: "app.kubernetes.io/name=postgresql",
-		DatabaseTypeMongoDB:    "apps.kubeblocks.io/component-name=mongodb",
-		DatabaseTypeRedis:      "apps.kubeblocks.io/component-name=redis",
+		DatabaseTypeMongoDB:    "apps.kubeblocks.io/cluster-type=mongodb",
+		DatabaseTypeRedis:      "apps.kubeblocks.io/cluster-type=redis",
 	}
 
 	// Determine namespace scope
