@@ -55,18 +55,18 @@ func (pc *PreflightChecker) CheckDatabase(
 		}
 	}
 
-	// If host is not a service hostname, do basic checks
-	if !pc.isServiceHost(host, namespace) {
-		// For non-service hosts (direct IP, external domain), do DNS check
-		if err := pc.checkDNS(host); err != nil {
-			return &PreflightError{
-				Type:    "dns_failed",
-				Message: err.Error(),
-			}
-		}
-
-		return nil
-	}
+	// // If host is not a service hostname, do basic checks
+	// if !pc.isServiceHost(host, namespace) {
+	// 	// For non-service hosts (direct IP, external domain), do DNS check
+	// 	if err := pc.checkDNS(host); err != nil {
+	// 		return &PreflightError{
+	// 			Type:    "dns_failed",
+	// 			Message: err.Error(),
+	// 		}
+	// 	}
+	//
+	// 	return nil
+	// }
 
 	// For service hosts, do comprehensive checks
 	serviceName := pc.extractServiceName(host)
