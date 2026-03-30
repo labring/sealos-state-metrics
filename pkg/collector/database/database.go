@@ -263,8 +263,8 @@ func (c *Collector) collectAllNamespaceTasks(ctx context.Context) []DatabaseTask
 	dbTypeSelectors := map[DatabaseType]string{
 		DatabaseTypeMySQL:      "apps.kubeblocks.io/cluster-type=mysql",
 		DatabaseTypePostgreSQL: "app.kubernetes.io/name=postgresql",
-		DatabaseTypeMongoDB:    "apps.kubeblocks.io/component-name=mongodb",
-		DatabaseTypeRedis:      "apps.kubeblocks.io/component-name=redis",
+		DatabaseTypeMongoDB:    "apps.kubeblocks.io/cluster-type=mongodb",
+		DatabaseTypeRedis:      "apps.kubeblocks.io/cluster-type=redis",
 	}
 
 	// Fetch all secrets for each database type across all namespaces
@@ -317,8 +317,8 @@ func (c *Collector) collectNamespaceTasks(
 	dbTypeSelectors := map[DatabaseType]string{
 		DatabaseTypeMySQL:      "apps.kubeblocks.io/cluster-type=mysql",
 		DatabaseTypePostgreSQL: "app.kubernetes.io/name=postgresql",
-		DatabaseTypeMongoDB:    "apps.kubeblocks.io/component-name=mongodb",
-		DatabaseTypeRedis:      "apps.kubeblocks.io/component-name=redis",
+		DatabaseTypeMongoDB:    "apps.kubeblocks.io/cluster-type=mongodb",
+		DatabaseTypeRedis:      "apps.kubeblocks.io/cluster-type=redis",
 	}
 
 	for dbType, selector := range dbTypeSelectors {
