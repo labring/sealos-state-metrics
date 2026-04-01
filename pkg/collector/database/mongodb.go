@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -73,9 +74,21 @@ func (c *Collector) parseMongoDBConnectionInfo(
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
-	// MongoDB default host and port
-	host := dbName + "-mongodb"
-	port := "27017"
+	// Extract endpoint from secret (same format as MySQL conn-credential)
+	endpoint, err := decodeSecret(secret.Data, "endpoint")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get endpoint: %w", err)
+	}
+
+	// Parse host and port
+	host := endpoint
+	port := "27017" // MongoDB default port
+
+	if strings.Contains(endpoint, ":") {
+		parts := strings.Split(endpoint, ":")
+		host = parts[0]
+		port = parts[1]
+	}
 
 	// Build full endpoint with K8s service domain
 	fullEndpoint := c.buildFullEndpoint(host, port, namespace)

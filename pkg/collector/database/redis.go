@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 	corev1 "k8s.io/api/core/v1"
@@ -59,9 +60,21 @@ func (c *Collector) parseRedisConnectionInfo(
 		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
 
-	// Redis default host and port
-	host := dbName + "-redis-redis"
-	port := "6379"
+	// Extract endpoint from secret (same format as MySQL conn-credential)
+	endpoint, err := decodeSecret(secret.Data, "endpoint")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get endpoint: %w", err)
+	}
+
+	// Parse host and port
+	host := endpoint
+	port := "6379" // Redis default port
+
+	if strings.Contains(endpoint, ":") {
+		parts := strings.Split(endpoint, ":")
+		host = parts[0]
+		port = parts[1]
+	}
 
 	// Build full endpoint with K8s service domain
 	fullEndpoint := c.buildFullEndpoint(host, port, namespace)
