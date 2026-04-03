@@ -2,7 +2,7 @@ package server
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -198,7 +198,7 @@ func collectorLeaseName(baseLeaseName, collectorName string) string {
 		return raw
 	}
 
-	sum := sha1.Sum([]byte(raw))
+	sum := sha256.Sum256([]byte(raw))
 	hashSuffix := hex.EncodeToString(sum[:4])
 
 	collectorPart := sanitizeLeasePart(collectorName)
