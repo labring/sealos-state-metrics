@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -201,6 +202,19 @@ func (r *Registry) StartLeaderCollectors(ctx context.Context) error {
 	return r.startCollectors(ctx, &requireLeader)
 }
 
+// StartCollector starts a single collector by name.
+func (r *Registry) StartCollector(ctx context.Context, name string) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	c, exists := r.collectors[name]
+	if !exists {
+		return fmt.Errorf("collector %s not found", name)
+	}
+
+	return c.Start(ctx)
+}
+
 // startCollectors starts collectors based on leader election filter.
 // - If requireLeader is nil, starts all collectors
 // - If requireLeader is false, starts only non-leader collectors
@@ -328,6 +342,19 @@ func (r *Registry) StopLeaderCollectors() error {
 	return nil
 }
 
+// StopCollector stops a single collector by name.
+func (r *Registry) StopCollector(name string) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	c, exists := r.collectors[name]
+	if !exists {
+		return fmt.Errorf("collector %s not found", name)
+	}
+
+	return c.Stop()
+}
+
 // StopNonLeaderCollectors stops only collectors that do not require leader election
 func (r *Registry) StopNonLeaderCollectors() error {
 	r.mu.RLock()
@@ -385,6 +412,23 @@ func (r *Registry) ListCollectors() []string {
 	for name := range r.collectors {
 		names = append(names, name)
 	}
+
+	return names
+}
+
+// ListCollectorsByLeaderRequirement returns collector names filtered by leader election requirement.
+func (r *Registry) ListCollectorsByLeaderRequirement(requireLeader bool) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.collectors))
+	for name, c := range r.collectors {
+		if c.RequiresLeaderElection() == requireLeader {
+			names = append(names, name)
+		}
+	}
+
+	sort.Strings(names)
 
 	return names
 }

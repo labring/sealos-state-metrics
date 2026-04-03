@@ -11,3 +11,5 @@
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/sealos-state-metrics.iml
 /.idea/vcs.xml
+/sealos-state-metrics
+/sealos-state-metrics.*

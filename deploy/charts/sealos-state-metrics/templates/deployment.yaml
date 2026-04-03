@@ -7,6 +7,10 @@ metadata:
     {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.updateStrategy.maxUnavailable | quote }}
   selector:
     matchLabels:
       {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}

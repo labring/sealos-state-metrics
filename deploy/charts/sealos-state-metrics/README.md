@@ -48,6 +48,7 @@ The following table lists the configurable parameters of the chart and their def
 | `replicaCount` | Number of replicas | `1` |
 | `image` | Image reference | `ghcr.io/labring/sealos-state-metrics:latest` |
 | `imagePullPolicy` | Image pull policy | `IfNotPresent` |
+| `updateStrategy.maxUnavailable` | Maximum unavailable pods during rolling update | `25%` |
 
 ### Scheduling
 

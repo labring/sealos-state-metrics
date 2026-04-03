@@ -30,7 +30,6 @@ type Server struct {
 	debugServer    *httpserver.Server
 	registry       *registry.Registry
 	promRegistry   *prometheus.Registry
-	leaderElector  *leaderelection.LeaderElector
 	clientProvider collector.ClientProvider // Shared client provider for lazy initialization
 	logger         *log.Entry
 
@@ -40,9 +39,8 @@ type Server struct {
 	serverCtx context.Context
 
 	// Leader election management
-	leCtxCancel context.CancelFunc
-	leDoneCh    chan struct{} // Closed when leader election goroutine exits
-	leMu        sync.Mutex
+	leaderElectors map[string]*collectorLeaderElector
+	leMu           sync.RWMutex
 }
 
 // New creates a new server instance
@@ -54,11 +52,12 @@ func New(cfg *config.GlobalConfig, configContent []byte, logger *log.Entry) *Ser
 	}
 
 	return &Server{
-		config:        cfg,
-		configContent: configContent,
-		registry:      registry.GetRegistry(),
-		promRegistry:  prometheus.NewRegistry(),
-		logger:        logger,
+		config:         cfg,
+		configContent:  configContent,
+		registry:       registry.GetRegistry(),
+		promRegistry:   prometheus.NewRegistry(),
+		logger:         logger,
+		leaderElectors: make(map[string]*collectorLeaderElector),
 	}
 }
 
@@ -230,11 +229,11 @@ func (s *Server) buildInitConfig() *registry.InitConfig {
 	}
 }
 
-// buildLeaderElectionConfig creates leaderelection.Config from current server state
-func (s *Server) buildLeaderElectionConfig() *leaderelection.Config {
+// buildLeaderElectionConfig creates collector-scoped leader election config from current server state.
+func (s *Server) buildLeaderElectionConfig(collectorName string) *leaderelection.Config {
 	return &leaderelection.Config{
 		Namespace: s.config.LeaderElection.Namespace,
-		LeaseName: s.config.LeaderElection.LeaseName,
+		LeaseName: collectorLeaseName(s.config.LeaderElection.LeaseName, collectorName),
 		Identity: identity.GetWithConfig(
 			s.config.Identity,
 			s.config.NodeName,
