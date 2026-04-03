@@ -87,23 +87,26 @@ func CheckHTTPWithIP(
 		}
 	}
 
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// Override the address with our specific IP
+			return (&net.Dialer{
+				Timeout: timeout,
+			}).DialContext(ctx, network, net.JoinHostPort(ip, strconv.Itoa(port)))
+		},
+		TLSClientConfig: &tls.Config{
+			//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
+			InsecureSkipVerify: skipTLSVerify,
+			MinVersion:         tls.VersionTLS12,
+			ServerName:         host,
+		},
+	}
+	defer transport.CloseIdleConnections()
+
 	// Create a transport that dials the specific IP
 	client := &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				// Override the address with our specific IP
-				return (&net.Dialer{
-					Timeout: timeout,
-				}).DialContext(ctx, network, net.JoinHostPort(ip, strconv.Itoa(port)))
-			},
-			TLSClientConfig: &tls.Config{
-				//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
-				InsecureSkipVerify: skipTLSVerify,
-				MinVersion:         tls.VersionTLS12,
-				ServerName:         host,
-			},
-		},
+		Timeout:   timeout,
+		Transport: transport,
 	}
 
 	start := time.Now()
@@ -139,8 +142,18 @@ func CheckHTTPWithIP(
 
 	defer resp.Body.Close()
 
+	success := resp.StatusCode >= 200 && resp.StatusCode < 500
+	if !success {
+		return &HTTPCheckResult{
+			Success:      false,
+			ResponseTime: responseTime,
+			StatusCode:   resp.StatusCode,
+			Error:        fmt.Sprintf("unexpected status code: %d", resp.StatusCode),
+		}
+	}
+
 	return &HTTPCheckResult{
-		Success:      resp.StatusCode >= 200 && resp.StatusCode < 500,
+		Success:      true,
 		ResponseTime: responseTime,
 		StatusCode:   resp.StatusCode,
 	}
