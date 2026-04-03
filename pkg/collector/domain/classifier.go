@@ -74,6 +74,7 @@ var (
 		regexp.MustCompile(`(?i)internal server error`),
 		regexp.MustCompile(`(?i)bad gateway`),
 		regexp.MustCompile(`(?i)service unavailable`),
+		regexp.MustCompile(`(?i)unexpected status code`),
 	}
 
 	sslErrorPatterns = []*regexp.Regexp{
