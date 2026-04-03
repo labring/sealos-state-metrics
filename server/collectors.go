@@ -16,8 +16,8 @@ func (s *Server) startCollectors() error {
 		s.logger.WithError(err).Warn("Some non-leader collectors failed to start")
 	}
 
-	// Setup leader election
-	return s.setupLeaderElection()
+	// Setup independent leader election for leader-managed collectors
+	return s.setupLeaderElections()
 }
 
 // stopCollectors stops all collectors based on current leader election configuration
@@ -26,8 +26,9 @@ func (s *Server) stopCollectors() error {
 
 	if s.config.LeaderElection.Enabled {
 		// Current state: leader election is enabled
-		// Stop leader election first (will trigger OnStoppedLeading callback to stop leader collectors)
-		s.stopLeaderElection()
+		// Stop leader election first (this triggers OnStoppedLeading callbacks for collectors
+		// currently led by this instance).
+		s.stopLeaderElections()
 		// Then stop non-leader collectors
 		if err := s.registry.StopNonLeaderCollectors(); err != nil {
 			logger.WithError(err).Warn("Failed to stop non-leader collectors")

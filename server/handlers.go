@@ -13,17 +13,13 @@ func (s *Server) handleHealth(c *gin.Context) {
 	healthStatus := make(map[string]string)
 	allHealthy := true
 
-	s.leMu.Lock()
-	isLeader := s.leaderElector != nil && s.leaderElector.IsLeader()
-	s.leMu.Unlock()
-
 	for name, collector := range allCollectors {
 		var shouldCheck bool
 		switch {
 		case !s.config.LeaderElection.Enabled:
 			shouldCheck = true
 		case collector.RequiresLeaderElection():
-			shouldCheck = isLeader
+			shouldCheck = s.isCollectorLeader(name)
 		default:
 			shouldCheck = true
 		}
@@ -67,14 +63,25 @@ func (s *Server) handleLeader(c *gin.Context) {
 		"enabled": s.config.LeaderElection.Enabled,
 	}
 
-	if s.leaderElector != nil {
-		response["isLeader"] = s.leaderElector.IsLeader()
-		response["currentLeader"] = s.leaderElector.GetLeader()
-		response["identity"] = s.leaderElector.GetIdentity()
-	} else {
+	if !s.config.LeaderElection.Enabled {
 		response["isLeader"] = true
 		response["message"] = "Leader election disabled"
+		c.JSON(http.StatusOK, response)
+		return
 	}
+
+	statuses := s.leaderStatuses()
+
+	isLeader := false
+	for _, status := range statuses {
+		if leader, ok := status["isLeader"].(bool); ok && leader {
+			isLeader = true
+			break
+		}
+	}
+
+	response["isLeader"] = isLeader
+	response["collectors"] = statuses
 
 	c.JSON(http.StatusOK, response)
 }
