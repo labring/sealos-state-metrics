@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.updateStrategy.maxUnavailable | quote }}
   selector:
     matchLabels:
       {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}

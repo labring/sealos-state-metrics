@@ -15,6 +15,9 @@ scheduling:
     topologyKey: kubernetes.io/hostname
     weight: 100
 
+updateStrategy:
+  maxUnavailable: 25%
+
 serviceAccount:
   create: true
   annotations: {}
