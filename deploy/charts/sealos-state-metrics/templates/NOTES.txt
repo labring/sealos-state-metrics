@@ -1,13 +1,18 @@
+{{- $deploymentMode := .Values.deploymentMode | default "daemonset" -}}
 Thank you for installing {{ .Chart.Name }}!
 
 Your release is named {{ .Release.Name }}.
 
 Enabled collectors: {{ .Values.enabledCollectors | join ", " }}
 
-Deployment mode: DaemonSet
+Deployment mode: {{ title $deploymentMode }}
 
 To get the status of your deployment:
+{{- if eq $deploymentMode "deployment" }}
+  kubectl get deployment {{ include "sealos-state-metrics.fullname" . }} -n {{ .Release.Namespace }}
+{{- else }}
   kubectl get daemonset {{ include "sealos-state-metrics.fullname" . }} -n {{ .Release.Namespace }}
+{{- end }}
 
 To view the pods:
   kubectl get pods -l app.kubernetes.io/name={{ include "sealos-state-metrics.name" . }} -n {{ .Release.Namespace }}
@@ -26,7 +31,21 @@ Configuration:
 {{- else }}
   - Leader election: disabled
 {{- end }}
+{{- if eq $deploymentMode "deployment" }}
+  - Replicas: {{ .Values.replicaCount }}
+  {{- if .Values.scheduling.preferDifferentNodes.enabled }}
+  - Scheduling preference: prefer different nodes (topology key: {{ .Values.scheduling.preferDifferentNodes.topologyKey }})
+  {{- end }}
+{{- end }}
   - Metrics namespace: {{ .Values.config.metrics.namespace | default "(none)" }}
   - Log level: {{ .Values.config.logging.level }}
+
+{{- if and (eq $deploymentMode "deployment") (has "lvm" .Values.enabledCollectors) }}
+
+WARNING:
+  The `lvm` collector is node-local, but the chart is running in Deployment mode.
+  Installation will continue, but LVM metrics will only be collected from nodes that actually run a replica.
+  For full-node LVM coverage, use `deploymentMode=daemonset`.
+{{- end }}
 
 For more information, visit: https://github.com/labring/sealos-state-metric

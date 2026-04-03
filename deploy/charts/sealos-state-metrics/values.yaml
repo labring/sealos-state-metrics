@@ -6,6 +6,15 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+deploymentMode: daemonset
+replicaCount: 1
+
+scheduling:
+  preferDifferentNodes:
+    enabled: true
+    topologyKey: kubernetes.io/hostname
+    weight: 100
+
 serviceAccount:
   create: true
   annotations: {}
