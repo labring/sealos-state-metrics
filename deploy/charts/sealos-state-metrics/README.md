@@ -16,6 +16,14 @@ To install the chart with the release name `sealos-state-metrics`:
 helm install sealos-state-metrics ./deploy/charts/sealos-state-metrics
 ```
 
+To install as a `Deployment` with multiple replicas:
+
+```bash
+helm install sealos-state-metrics ./deploy/charts/sealos-state-metrics \
+  --set deploymentMode=deployment \
+  --set replicaCount=3
+```
+
 To install in a specific namespace:
 
 ```bash
@@ -36,10 +44,18 @@ The following table lists the configurable parameters of the chart and their def
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
+| `deploymentMode` | Workload type: `daemonset` or `deployment` | `daemonset` |
 | `replicaCount` | Number of replicas | `1` |
-| `image.repository` | Image repository | `ghcr.io/labring/sealos-state-metrics` |
-| `image.tag` | Image tag | `""` (uses appVersion) |
-| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `image` | Image reference | `ghcr.io/labring/sealos-state-metrics:latest` |
+| `imagePullPolicy` | Image pull policy | `IfNotPresent` |
+
+### Scheduling
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `scheduling.preferDifferentNodes.enabled` | Add soft pod anti-affinity in `deployment` mode | `true` |
+| `scheduling.preferDifferentNodes.topologyKey` | Topology key used for pod spreading preference | `kubernetes.io/hostname` |
+| `scheduling.preferDifferentNodes.weight` | Weight for the preferred anti-affinity rule | `100` |
 
 ### Service Account
 

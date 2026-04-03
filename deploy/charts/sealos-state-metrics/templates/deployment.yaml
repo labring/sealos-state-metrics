@@ -1,11 +1,12 @@
-{{- if and .Values.enabledCollectors (eq (.Values.deploymentMode | default "daemonset") "daemonset") }}
+{{- if and .Values.enabledCollectors (eq (.Values.deploymentMode | default "daemonset") "deployment") }}
 apiVersion: apps/v1
-kind: DaemonSet
+kind: Deployment
 metadata:
   name: {{ include "sealos-state-metrics.fullname" . }}
   labels:
     {{- include "sealos-state-metrics.labels" . | nindent 4 }}
 spec:
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "sealos-state-metrics.selectorLabels" . | nindent 6 }}
