@@ -21,8 +21,10 @@ collectors:
     domains:
       - endpoint: example.com
         skipTLSVerify: false
+        followHTTPRedirects: true
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
+        followHTTPRedirects: false
       - api.example.com
     checkTimeout: "15s"
     checkInterval: "1m"
@@ -35,7 +37,7 @@ collectors:
 `domains` supports mixed entries:
 
 - Legacy string entries such as `example.com` or `api.example.com:8443`
-- Object entries such as `{ endpoint: internal.example.local:8443, skipTLSVerify: true }`
+- Object entries such as `{ endpoint: internal.example.local:8443, skipTLSVerify: true, followHTTPRedirects: false }`
 
 ### Configuration Fields
 
@@ -44,6 +46,7 @@ collectors:
 | `domains` | `[]string` or `[]object` | `[]` | List of domains to monitor. Entries may be strings or objects with per-domain options |
 | `domains[].endpoint` | string | - | Domain endpoint in `host` or `host:port` format |
 | `domains[].skipTLSVerify` | bool | `false` | Skip TLS certificate verification for this domain during HTTPS and cert checks |
+| `domains[].followHTTPRedirects` | bool | `true` | Follow HTTP redirects for this domain during HTTP checks |
 | `checkTimeout` | duration | `15s` | Timeout for each health check |
 | `checkInterval` | duration | `1m` | Interval between check cycles |
 | `includeIPv4` | bool | `true` | Include IPv4 addresses returned by DNS resolution |
@@ -69,7 +72,7 @@ Notes:
 
 - `COLLECTORS_DOMAIN_DOMAINS` only supports the legacy comma-separated string format.
 - If `COLLECTORS_DOMAIN_DOMAINS` is set, it overrides the YAML `domains` list.
-- `skipTLSVerify` is only configurable through YAML object entries.
+- `skipTLSVerify` and `followHTTPRedirects` are only configurable through YAML object entries.
 
 ## Metrics
 
@@ -228,6 +231,8 @@ An IP is considered **unhealthy** if:
 - TLS certificate checks are performed independently for each resolved IP.
 - DNS results can be filtered globally with `includeIPv4` and `includeIPv6`.
 - HTTP checks and certificate checks both honor the per-domain `skipTLSVerify` option.
+- When `domains[].followHTTPRedirects=true`, redirects to the original monitored host continue to use the resolved IP being checked. Redirects to a different host fall back to the default dial path so the redirected hostname is resolved normally.
+- When `domains[].followHTTPRedirects=false`, the HTTP check returns the first redirect response instead of following it.
 - When `skipTLSVerify=true`, TLS chain and hostname verification are skipped for that domain. This is intended for internal endpoints with self-signed or privately issued certificates.
 
 ### DNS Resolution Failures

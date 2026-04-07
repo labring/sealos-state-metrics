@@ -79,6 +79,7 @@ func CheckHTTPWithIP(
 	ip string,
 	skipTLSVerify bool,
 	timeout time.Duration,
+	followRedirects bool,
 ) *HTTPCheckResult {
 	if err := validateMonitoringTarget(host, port, ip); err != nil {
 		return &HTTPCheckResult{
@@ -87,18 +88,30 @@ func CheckHTTPWithIP(
 		}
 	}
 
+	defaultDialer := &net.Dialer{
+		Timeout: timeout,
+	}
+
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// Override the address with our specific IP
-			return (&net.Dialer{
-				Timeout: timeout,
-			}).DialContext(ctx, network, net.JoinHostPort(ip, strconv.Itoa(port)))
+			dialHost, dialPort, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			// Keep the IP-pinned dial only for the configured domain. Redirects to
+			// another host fall back to the default dialer so the new destination can
+			// resolve and connect normally.
+			if sameHostname(dialHost, host) {
+				return defaultDialer.DialContext(ctx, network, net.JoinHostPort(ip, dialPort))
+			}
+
+			return defaultDialer.DialContext(ctx, network, addr)
 		},
 		TLSClientConfig: &tls.Config{
 			//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
 			InsecureSkipVerify: skipTLSVerify,
 			MinVersion:         tls.VersionTLS12,
-			ServerName:         host,
 		},
 	}
 	defer transport.CloseIdleConnections()
@@ -107,6 +120,11 @@ func CheckHTTPWithIP(
 	client := &http.Client{
 		Timeout:   timeout,
 		Transport: transport,
+	}
+	if !followRedirects {
+		client.CheckRedirect = func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 	}
 
 	start := time.Now()
@@ -296,4 +314,15 @@ func validateHostname(host string) error {
 	}
 
 	return nil
+}
+
+func sameHostname(left, right string) bool {
+	return strings.EqualFold(normalizeHostname(left), normalizeHostname(right))
+}
+
+func normalizeHostname(host string) string {
+	host = strings.TrimSpace(host)
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return host
 }

@@ -20,14 +20,16 @@ type DomainTarget struct {
 }
 
 type monitoredDomain struct {
-	endpoint      string
-	target        DomainTarget
-	skipTLSVerify bool
+	endpoint            string
+	target              DomainTarget
+	skipTLSVerify       bool
+	followHTTPRedirects bool
 }
 
 type monitoredDomainConfig struct {
-	Endpoint      string `mapstructure:"endpoint"`
-	SkipTLSVerify bool   `mapstructure:"skipTLSVerify"`
+	Endpoint            string `mapstructure:"endpoint"`
+	SkipTLSVerify       bool   `mapstructure:"skipTLSVerify"`
+	FollowHTTPRedirects *bool  `mapstructure:"followHTTPRedirects"`
 }
 
 type runtimeConfig struct {
@@ -107,8 +109,9 @@ func parseMonitoredDomainString(value string) (monitoredDomain, error) {
 	}
 
 	return monitoredDomain{
-		endpoint: endpoint,
-		target:   target,
+		endpoint:            endpoint,
+		target:              target,
+		followHTTPRedirects: true,
 	}, nil
 }
 
@@ -142,6 +145,9 @@ func parseMonitoredDomainMap(value map[string]any) (monitoredDomain, error) {
 	}
 
 	domain.skipTLSVerify = cfg.SkipTLSVerify
+	if cfg.FollowHTTPRedirects != nil {
+		domain.followHTTPRedirects = *cfg.FollowHTTPRedirects
+	}
 
 	return domain, nil
 }

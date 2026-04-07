@@ -36,7 +36,6 @@ func (s *Server) setupLeaderElections() error {
 	handles := make(map[string]*collectorLeaderElector, len(collectorNames))
 
 	for _, collectorName := range collectorNames {
-
 		cfg := s.buildLeaderElectionConfig(collectorName)
 		leaseName := cfg.LeaseName
 
