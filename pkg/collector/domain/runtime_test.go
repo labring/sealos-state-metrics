@@ -24,6 +24,7 @@ func TestNewDefaultConfig(t *testing.T) {
 	if !cfg.IncludeIPv6 {
 		t.Fatal("IncludeIPv6 = false, want true")
 	}
+
 }
 
 func TestParseDomainTarget(t *testing.T) {
@@ -162,6 +163,10 @@ func TestNewRuntimeConfig(t *testing.T) {
 		t.Fatalf("first.skipTLSVerify = true, want false")
 	}
 
+	if !first.followHTTPRedirects {
+		t.Fatal("first.followHTTPRedirects = false, want true")
+	}
+
 	second := runtimeCfg.domains[1]
 	if second.endpoint != "registry.fake.local:5000" ||
 		second.target.Host != "registry.fake.local" ||
@@ -198,12 +203,14 @@ func TestNewRuntimeConfig_ObjectDomains(t *testing.T) {
 	cfg := &Config{
 		Domains: []any{
 			map[string]any{
-				"endpoint":      "example.com",
-				"skipTLSVerify": false,
+				"endpoint":            "example.com",
+				"skipTLSVerify":       false,
+				"followHTTPRedirects": false,
 			},
 			map[string]any{
-				"endpoint":      "internal.example.local:8443",
-				"skipTLSVerify": true,
+				"endpoint":            "internal.example.local:8443",
+				"skipTLSVerify":       true,
+				"followHTTPRedirects": true,
 			},
 		},
 		CheckTimeout:     15 * time.Second,
@@ -224,7 +231,7 @@ func TestNewRuntimeConfig_ObjectDomains(t *testing.T) {
 	}
 
 	first := runtimeCfg.domains[0]
-	if first.endpoint != "example.com" || first.skipTLSVerify {
+	if first.endpoint != "example.com" || first.skipTLSVerify || first.followHTTPRedirects {
 		t.Fatalf("unexpected first domain: %#v", first)
 	}
 
@@ -232,7 +239,8 @@ func TestNewRuntimeConfig_ObjectDomains(t *testing.T) {
 	if second.endpoint != "internal.example.local:8443" ||
 		second.target.Host != "internal.example.local" ||
 		second.target.Port != 8443 ||
-		!second.skipTLSVerify {
+		!second.skipTLSVerify ||
+		!second.followHTTPRedirects {
 		t.Fatalf("unexpected second domain: %#v", second)
 	}
 }
@@ -242,8 +250,9 @@ func TestNewRuntimeConfig_MixedDomains(t *testing.T) {
 		Domains: []any{
 			"example.com",
 			map[string]any{
-				"endpoint":      "internal.example.local:8443",
-				"skipTLSVerify": true,
+				"endpoint":            "internal.example.local:8443",
+				"skipTLSVerify":       true,
+				"followHTTPRedirects": false,
 			},
 			"api.example.com",
 		},
@@ -268,21 +277,28 @@ func TestNewRuntimeConfig_MixedDomains(t *testing.T) {
 		t.Fatalf("unexpected first mixed domain: %#v", runtimeCfg.domains[0])
 	}
 
+	if !runtimeCfg.domains[0].followHTTPRedirects {
+		t.Fatalf("unexpected first mixed domain redirect setting: %#v", runtimeCfg.domains[0])
+	}
+
 	if runtimeCfg.domains[1].endpoint != "internal.example.local:8443" ||
 		runtimeCfg.domains[1].target.Port != 8443 ||
-		!runtimeCfg.domains[1].skipTLSVerify {
+		!runtimeCfg.domains[1].skipTLSVerify ||
+		runtimeCfg.domains[1].followHTTPRedirects {
 		t.Fatalf("unexpected second mixed domain: %#v", runtimeCfg.domains[1])
 	}
 
-	if runtimeCfg.domains[2].endpoint != "api.example.com" || runtimeCfg.domains[2].skipTLSVerify {
+	if runtimeCfg.domains[2].endpoint != "api.example.com" || runtimeCfg.domains[2].skipTLSVerify ||
+		!runtimeCfg.domains[2].followHTTPRedirects {
 		t.Fatalf("unexpected third mixed domain: %#v", runtimeCfg.domains[2])
 	}
 }
 
 func TestParseMonitoredDomainMap_WeaklyTypedInput(t *testing.T) {
 	domain, err := parseMonitoredDomainMap(map[string]any{
-		"endpoint":      "internal.example.local:8443",
-		"skipTLSVerify": "true",
+		"endpoint":            "internal.example.local:8443",
+		"skipTLSVerify":       "true",
+		"followHTTPRedirects": "false",
 	})
 	if err != nil {
 		t.Fatalf("parseMonitoredDomainMap() returned error: %v", err)
@@ -298,6 +314,10 @@ func TestParseMonitoredDomainMap_WeaklyTypedInput(t *testing.T) {
 
 	if !domain.skipTLSVerify {
 		t.Fatal("domain.skipTLSVerify = false, want true")
+	}
+
+	if domain.followHTTPRedirects {
+		t.Fatal("domain.followHTTPRedirects = true, want false")
 	}
 }
 
@@ -340,9 +360,14 @@ func TestNewRuntimeConfig_DomainsEnvOverridesYAML(t *testing.T) {
 		t.Fatalf("unexpected first env domain: %#v", runtimeCfg.domains[0])
 	}
 
+	if !runtimeCfg.domains[0].followHTTPRedirects {
+		t.Fatalf("unexpected first env domain redirect setting: %#v", runtimeCfg.domains[0])
+	}
+
 	if runtimeCfg.domains[1].endpoint != "env-alt.example.com:8443" ||
 		runtimeCfg.domains[1].target.Port != 8443 ||
-		runtimeCfg.domains[1].skipTLSVerify {
+		runtimeCfg.domains[1].skipTLSVerify ||
+		!runtimeCfg.domains[1].followHTTPRedirects {
 		t.Fatalf("unexpected second env domain: %#v", runtimeCfg.domains[1])
 	}
 }

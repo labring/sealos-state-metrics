@@ -261,6 +261,7 @@ func (dc *DomainChecker) runIPChecks(
 			ip,
 			domain.skipTLSVerify,
 			dc.timeout,
+			domain.followHTTPRedirects,
 		)
 		health.HTTPOk = result.Success
 		health.HTTPError = result.Error
