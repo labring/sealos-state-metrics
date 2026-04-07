@@ -24,7 +24,6 @@ func TestNewDefaultConfig(t *testing.T) {
 	if !cfg.IncludeIPv6 {
 		t.Fatal("IncludeIPv6 = false, want true")
 	}
-
 }
 
 func TestParseDomainTarget(t *testing.T) {

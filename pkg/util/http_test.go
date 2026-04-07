@@ -12,20 +12,29 @@ import (
 )
 
 func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t *testing.T) {
-	redirectTarget := newLocalTLSServerOnAddr(t, "127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
+	redirectTarget := newLocalTLSServerOnAddr(
+		t,
+		"127.0.0.1:0",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
 	defer redirectTarget.Close()
 
 	redirectURL, err := url.Parse(redirectTarget.URL)
 	if err != nil {
 		t.Fatalf("failed to parse redirect target URL: %v", err)
 	}
+
 	redirectURL.Host = net.JoinHostPort("localhost", redirectURL.Port())
 
-	origin := newLocalTLSServerOnAddr(t, "127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, redirectURL.String(), http.StatusFound)
-	}))
+	origin := newLocalTLSServerOnAddr(
+		t,
+		"127.0.0.1:0",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, redirectURL.String(), http.StatusFound)
+		}),
+	)
 	defer origin.Close()
 
 	originURL, err := url.Parse(origin.URL)
@@ -57,9 +66,13 @@ func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t
 }
 
 func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
-	origin := newLocalTLSServerOnAddr(t, "127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "https://localhost/next", http.StatusFound)
-	}))
+	origin := newLocalTLSServerOnAddr(
+		t,
+		"127.0.0.1:0",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "https://localhost/next", http.StatusFound)
+		}),
+	)
 	defer origin.Close()
 
 	originURL, err := url.Parse(origin.URL)
