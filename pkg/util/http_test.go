@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests need access to internal retryDialContext helper.
 package util
 
 import (
@@ -136,6 +137,7 @@ func TestRetryDialContext_StopsOnContextCancellation(t *testing.T) {
 	dialContext := retryDialContext(
 		func(context.Context, string, string) (net.Conn, error) {
 			attempts++
+
 			cancel()
 			return nil, errors.New("temporary dial failure")
 		},
@@ -173,7 +175,7 @@ func TestRetryDialContext_NormalizesInvalidRetries(t *testing.T) {
 func newLocalTLSServerOnAddr(t *testing.T, addr string, handler http.Handler) *httptest.Server {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		t.Fatalf("failed to listen on %q: %v", addr, err)
 	}

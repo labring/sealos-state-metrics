@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -54,19 +53,6 @@ func (pc *PreflightChecker) CheckDatabase(
 			Message: fmt.Sprintf("failed to extract host: %v", err),
 		}
 	}
-
-	// // If host is not a service hostname, do basic checks
-	// if !pc.isServiceHost(host, namespace) {
-	// 	// For non-service hosts (direct IP, external domain), do DNS check
-	// 	if err := pc.checkDNS(host); err != nil {
-	// 		return &PreflightError{
-	// 			Type:    "dns_failed",
-	// 			Message: err.Error(),
-	// 		}
-	// 	}
-	//
-	// 	return nil
-	// }
 
 	// For service hosts, do comprehensive checks
 	serviceName := pc.extractServiceName(host)
@@ -176,37 +162,11 @@ func (pc *PreflightChecker) parseHostFromURL(urlStr string) (string, error) {
 	return host, nil
 }
 
-// isServiceHost checks if the host appears to be a Kubernetes service
-func (pc *PreflightChecker) isServiceHost(host, namespace string) bool {
-	// Check for typical service DNS patterns:
-	// - servicename.namespace.svc.cluster.local
-	// - servicename.namespace.svc
-	// - servicename.namespace
-	// - servicename (if in same namespace)
-	return strings.Contains(host, ".svc.cluster.local") || strings.Contains(host, ".svc")
-}
-
 // extractServiceName extracts service name from service hostname
 func (pc *PreflightChecker) extractServiceName(host string) string {
 	// Remove .namespace.svc.cluster.local suffix
 	host = strings.Split(host, ".")[0]
 	return host
-}
-
-// checkDNS performs a quick DNS lookup
-func (pc *PreflightChecker) checkDNS(host string) error {
-	// Quick DNS resolution check
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	resolver := &net.Resolver{}
-
-	_, err := resolver.LookupHost(ctx, host)
-	if err != nil {
-		return fmt.Errorf("DNS lookup failed for %s: %w", host, err)
-	}
-
-	return nil
 }
 
 // checkServiceExists checks if a service exists

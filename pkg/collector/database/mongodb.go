@@ -23,11 +23,11 @@ type MongoDBConnectionInfo struct {
 // checkMongoDBConnectivity checks MongoDB database connectivity
 func (c *Collector) checkMongoDBConnectivity(
 	ctx context.Context,
-	namespace, dbName string,
+	namespace string,
 	secret *corev1.Secret,
 ) error {
 	// 1. Parse connection information
-	connInfo, err := c.parseMongoDBConnectionInfo(secret, namespace, dbName)
+	connInfo, err := c.parseMongoDBConnectionInfo(secret, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
@@ -60,7 +60,7 @@ func (c *Collector) checkMongoDBConnectivity(
 // parseMongoDBConnectionInfo parses connection information from secret
 func (c *Collector) parseMongoDBConnectionInfo(
 	secret *corev1.Secret,
-	namespace, dbName string,
+	namespace string,
 ) (*MongoDBConnectionInfo, error) {
 	// Extract username
 	username, err := decodeSecret(secret.Data, "username")

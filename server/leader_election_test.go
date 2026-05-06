@@ -1,3 +1,4 @@
+//nolint:testpackage // Tests need access to internal collectorLeaseName helper.
 package server
 
 import (

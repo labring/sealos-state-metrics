@@ -99,6 +99,7 @@ func CheckIPReachabilityWithRetries(
 	}
 
 	dialContext := retryDialContext(dialer.DialContext, dialRetries)
+
 	conn, err := dialContext(ctx, "tcp", net.JoinHostPort(ip, strconv.Itoa(port)))
 	if err != nil {
 		return false

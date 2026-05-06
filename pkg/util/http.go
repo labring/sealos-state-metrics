@@ -81,7 +81,16 @@ func CheckHTTPWithIP(
 	timeout time.Duration,
 	followRedirects bool,
 ) *HTTPCheckResult {
-	return CheckHTTPWithIPAndRetries(ctx, host, port, ip, skipTLSVerify, timeout, followRedirects, 1)
+	return CheckHTTPWithIPAndRetries(
+		ctx,
+		host,
+		port,
+		ip,
+		skipTLSVerify,
+		timeout,
+		followRedirects,
+		1,
+	)
 }
 
 // CheckHTTPWithIPAndRetries performs an HTTP/HTTPS health check to a specific IP address
@@ -243,6 +252,7 @@ func getTLSCert(
 	defer cancel()
 
 	dialContext := retryDialContext(dialer.DialContext, dialRetries)
+
 	conn, err := dialContext(ctx, "tcp", net.JoinHostPort(dialHost, strconv.Itoa(port)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %w", err)
@@ -367,13 +377,14 @@ func retryDialContext(dialContext dialContextFunc, retries int) dialContextFunc 
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		var lastErr error
-		for attempt := 0; attempt < retries; attempt++ {
+		for range retries {
 			conn, err := dialContext(ctx, network, addr)
 			if err == nil {
 				return conn, nil
 			}
 
 			lastErr = err
+
 			if ctx.Err() != nil {
 				break
 			}
