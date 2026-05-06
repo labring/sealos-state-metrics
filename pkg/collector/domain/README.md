@@ -28,6 +28,7 @@ collectors:
       - api.example.com
     checkTimeout: "15s"
     checkInterval: "1m"
+    dialRetries: 3
     includeIPv4: true
     includeIPv6: true
     includeCertCheck: true
@@ -49,6 +50,7 @@ collectors:
 | `domains[].followHTTPRedirects` | bool | `true` | Follow HTTP redirects for this domain during HTTP checks |
 | `checkTimeout` | duration | `15s` | Timeout for each health check |
 | `checkInterval` | duration | `1m` | Interval between check cycles |
+| `dialRetries` | int | `3` | Number of dial attempts for HTTP and certificate checks |
 | `includeIPv4` | bool | `true` | Include IPv4 addresses returned by DNS resolution |
 | `includeIPv6` | bool | `true` | Include IPv6 addresses returned by DNS resolution |
 | `includeCertCheck` | bool | `true` | Enable TLS certificate validation |
@@ -63,6 +65,7 @@ All configuration can be overridden using environment variables with the prefix 
 | `COLLECTORS_DOMAIN_DOMAINS` | `domains` | `example.com,api.example.com` |
 | `COLLECTORS_DOMAIN_CHECK_TIMEOUT` | `checkTimeout` | `10s` |
 | `COLLECTORS_DOMAIN_CHECK_INTERVAL` | `checkInterval` | `10m` |
+| `COLLECTORS_DOMAIN_DIAL_RETRIES` | `dialRetries` | `3` |
 | `COLLECTORS_DOMAIN_INCLUDE_IPV4` | `includeIPv4` | `true` |
 | `COLLECTORS_DOMAIN_INCLUDE_IPV6` | `includeIPv6` | `false` |
 | `COLLECTORS_DOMAIN_INCLUDE_CERT_CHECK` | `includeCertCheck` | `true` |

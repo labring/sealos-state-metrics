@@ -99,6 +99,7 @@ collectors:
         skipTLSVerify: false
     checkInterval: "1m"
     checkTimeout: "15s"
+    dialRetries: 3
     includeIPv4: true
     includeIPv6: true
 ```
@@ -238,6 +239,7 @@ collectors:
       - api.example.com
     checkInterval: "1m"
     checkTimeout: "15s"
+    dialRetries: 3
     includeIPv4: true
     includeIPv6: true
     includeCertCheck: true
@@ -264,6 +266,7 @@ export LEADER_ELECTION_ENABLED="false"
 
 # Collector settings
 export COLLECTORS_DOMAIN_CHECK_INTERVAL="1m"
+export COLLECTORS_DOMAIN_DIAL_RETRIES="3"
 export COLLECTORS_DOMAIN_DOMAINS="example.com,test.com"
 export COLLECTORS_DATABASE_NAMESPACES="default,production"
 
@@ -876,6 +879,7 @@ collectors:
   domain:
     checkInterval: "1m"   # Default
     checkTimeout: "15s"   # Default
+    dialRetries: 3        # Default
 
   database:
     checkInterval: "5m"   # Balance between freshness and load

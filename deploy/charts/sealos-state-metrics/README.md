@@ -120,14 +120,14 @@ The following table lists the configurable parameters of the chart and their def
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `config.domain.enabled` | Enable domain collector | `true` |
-| `config.domain.domains` | List of domains to check. Supports mixed string entries and object entries with `endpoint` and `skipTLSVerify` | `[]` |
-| `config.domain.checkTimeout` | HTTP and TLS check timeout | `15s` |
-| `config.domain.checkInterval` | Check interval | `1m` |
-| `config.domain.includeIPv4` | Include IPv4 addresses returned by DNS | `true` |
-| `config.domain.includeIPv6` | Include IPv6 addresses returned by DNS | `true` |
-| `config.domain.includeCertCheck` | Include certificate checks | `true` |
-| `config.domain.includeHTTPCheck` | Include HTTP checks | `true` |
+| `collectors.domain.domains` | List of domains to check. Supports mixed string entries and object entries with `endpoint` and `skipTLSVerify` | `[]` |
+| `collectors.domain.checkTimeout` | HTTP and TLS check timeout | `15s` |
+| `collectors.domain.checkInterval` | Check interval | `1m` |
+| `collectors.domain.dialRetries` | Number of dial attempts for HTTP and certificate checks | `3` |
+| `collectors.domain.includeIPv4` | Include IPv4 addresses returned by DNS | `true` |
+| `collectors.domain.includeIPv6` | Include IPv6 addresses returned by DNS | `true` |
+| `collectors.domain.includeCertCheck` | Include certificate checks | `true` |
+| `collectors.domain.includeHTTPCheck` | Include HTTP checks | `true` |
 
 Notes:
 
@@ -180,9 +180,11 @@ Notes:
 replicaCount: 2
 
 config:
-  logLevel: debug
+  logging:
+    level: debug
+
+collectors:
   domain:
-    enabled: true
     domains:
       - example.com
       - endpoint: internal.example.local:8443
@@ -190,12 +192,13 @@ config:
       - test.com
     checkTimeout: 15s
     checkInterval: 1m
+    dialRetries: 3
     includeIPv4: true
     includeIPv6: true
 
-  leaderElection:
-    enabled: true
-    namespace: sealos-system
+leaderElection:
+  enabled: true
+  namespace: sealos-system
 
 serviceMonitor:
   enabled: true

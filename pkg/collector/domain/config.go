@@ -10,6 +10,7 @@ type Config struct {
 	DomainsEnv       []string      `yaml:"-"                env:"DOMAINS"            envSeparator:","`
 	CheckTimeout     time.Duration `yaml:"checkTimeout"     env:"CHECK_TIMEOUT"`
 	CheckInterval    time.Duration `yaml:"checkInterval"    env:"CHECK_INTERVAL"`
+	DialRetries      int           `yaml:"dialRetries"      env:"DIAL_RETRIES"`
 	IncludeCertCheck bool          `yaml:"includeCertCheck" env:"INCLUDE_CERT_CHECK"`
 	IncludeHTTPCheck bool          `yaml:"includeHTTPCheck" env:"INCLUDE_HTTP_CHECK"`
 	IncludeIPv4      bool          `yaml:"includeIPv4"      env:"INCLUDE_IPV4"`
@@ -24,6 +25,7 @@ func NewDefaultConfig() *Config {
 		DomainsEnv:       []string{},
 		CheckTimeout:     15 * time.Second,
 		CheckInterval:    1 * time.Minute,
+		DialRetries:      3,
 		IncludeCertCheck: true,
 		IncludeHTTPCheck: true,
 		IncludeIPv4:      true,

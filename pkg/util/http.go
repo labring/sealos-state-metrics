@@ -81,6 +81,21 @@ func CheckHTTPWithIP(
 	timeout time.Duration,
 	followRedirects bool,
 ) *HTTPCheckResult {
+	return CheckHTTPWithIPAndRetries(ctx, host, port, ip, skipTLSVerify, timeout, followRedirects, 1)
+}
+
+// CheckHTTPWithIPAndRetries performs an HTTP/HTTPS health check to a specific IP address
+// and retries failed dial attempts up to dialRetries total attempts.
+func CheckHTTPWithIPAndRetries(
+	ctx context.Context,
+	host string,
+	port int,
+	ip string,
+	skipTLSVerify bool,
+	timeout time.Duration,
+	followRedirects bool,
+	dialRetries int,
+) *HTTPCheckResult {
 	if err := validateMonitoringTarget(host, port, ip); err != nil {
 		return &HTTPCheckResult{
 			Success: false,
@@ -91,6 +106,7 @@ func CheckHTTPWithIP(
 	defaultDialer := &net.Dialer{
 		Timeout: timeout,
 	}
+	dialContext := retryDialContext(defaultDialer.DialContext, dialRetries)
 
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -103,10 +119,10 @@ func CheckHTTPWithIP(
 			// another host fall back to the default dialer so the new destination can
 			// resolve and connect normally.
 			if sameHostname(dialHost, host) {
-				return defaultDialer.DialContext(ctx, network, net.JoinHostPort(ip, dialPort))
+				return dialContext(ctx, network, net.JoinHostPort(ip, dialPort))
 			}
 
-			return defaultDialer.DialContext(ctx, network, addr)
+			return dialContext(ctx, network, addr)
 		},
 		TLSClientConfig: &tls.Config{
 			//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
@@ -186,11 +202,24 @@ func GetTLSCertWithIP(
 	skipTLSVerify bool,
 	timeout time.Duration,
 ) (*CertInfo, error) {
+	return GetTLSCertWithIPAndRetries(host, port, ip, skipTLSVerify, timeout, 1)
+}
+
+// GetTLSCertWithIPAndRetries retrieves the TLS certificate by dialing a specific IP
+// and retries failed dial attempts up to dialRetries total attempts.
+func GetTLSCertWithIPAndRetries(
+	host string,
+	port int,
+	ip string,
+	skipTLSVerify bool,
+	timeout time.Duration,
+	dialRetries int,
+) (*CertInfo, error) {
 	if err := validateMonitoringTarget(host, port, ip); err != nil {
 		return nil, fmt.Errorf("invalid request target: %w", err)
 	}
 
-	return getTLSCert(host, port, ip, skipTLSVerify, timeout)
+	return getTLSCert(host, port, ip, skipTLSVerify, timeout, dialRetries)
 }
 
 func getTLSCert(
@@ -199,6 +228,7 @@ func getTLSCert(
 	dialHost string,
 	skipTLSVerify bool,
 	timeout time.Duration,
+	dialRetries int,
 ) (*CertInfo, error) {
 	dialer := &tls.Dialer{
 		Config: &tls.Config{
@@ -212,7 +242,8 @@ func getTLSCert(
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(dialHost, strconv.Itoa(port)))
+	dialContext := retryDialContext(dialer.DialContext, dialRetries)
+	conn, err := dialContext(ctx, "tcp", net.JoinHostPort(dialHost, strconv.Itoa(port)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial: %w", err)
 	}
@@ -325,4 +356,29 @@ func normalizeHostname(host string) string {
 	host = strings.TrimPrefix(host, "[")
 	host = strings.TrimSuffix(host, "]")
 	return host
+}
+
+type dialContextFunc func(context.Context, string, string) (net.Conn, error)
+
+func retryDialContext(dialContext dialContextFunc, retries int) dialContextFunc {
+	if retries < 1 {
+		retries = 1
+	}
+
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		var lastErr error
+		for attempt := 0; attempt < retries; attempt++ {
+			conn, err := dialContext(ctx, network, addr)
+			if err == nil {
+				return conn, nil
+			}
+
+			lastErr = err
+			if ctx.Err() != nil {
+				break
+			}
+		}
+
+		return nil, lastErr
+	}
 }

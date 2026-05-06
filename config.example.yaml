@@ -129,6 +129,8 @@ collectors:
     checkTimeout: "15s"
     # Check interval (how often to check all domains)
     checkInterval: "1m"
+    # Number of dial attempts for HTTP and certificate checks
+    dialRetries: 3
     # Include IPv4 addresses resolved from DNS
     includeIPv4: true
     # Include IPv6 addresses resolved from DNS
@@ -219,6 +221,7 @@ collectors:
 #
 # Collector config: Use prefix COLLECTORS_<COLLECTOR>_
 #   COLLECTORS_DOMAIN_CHECK_INTERVAL=10m
+#   COLLECTORS_DOMAIN_DIAL_RETRIES=3
 #   COLLECTORS_DOMAIN_DOMAINS=example.com,test.com
 #   COLLECTORS_POD_RESTART_THRESHOLD=10
 #   COLLECTORS_ZOMBIE_CHECK_INTERVAL=1m

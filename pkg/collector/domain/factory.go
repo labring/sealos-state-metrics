@@ -50,6 +50,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 		runtimeCfg.includeCertCheck,
 		runtimeCfg.includeIPv4,
 		runtimeCfg.includeIPv6,
+		runtimeCfg.dialRetries,
 	)
 
 	c.initMetrics(factoryCtx.MetricsNamespace)
