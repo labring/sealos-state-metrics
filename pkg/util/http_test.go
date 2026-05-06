@@ -1,7 +1,9 @@
+//nolint:testpackage // Tests need access to internal retryDialContext helper.
 package util
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -99,10 +101,81 @@ func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
 	}
 }
 
+func TestRetryDialContext_RetriesUntilSuccess(t *testing.T) {
+	attempts := 0
+	wantConn := &mockConn{}
+	dialContext := retryDialContext(
+		func(context.Context, string, string) (net.Conn, error) {
+			attempts++
+			if attempts < 3 {
+				return nil, errors.New("temporary dial failure")
+			}
+
+			return wantConn, nil
+		},
+		3,
+	)
+
+	conn, err := dialContext(context.Background(), "tcp", "127.0.0.1:443")
+	if err != nil {
+		t.Fatalf("retry dial returned error: %v", err)
+	}
+
+	if conn != wantConn {
+		t.Fatalf("retry dial returned %#v, want %#v", conn, wantConn)
+	}
+
+	if attempts != 3 {
+		t.Fatalf("attempts = %d, want 3", attempts)
+	}
+}
+
+func TestRetryDialContext_StopsOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	attempts := 0
+
+	dialContext := retryDialContext(
+		func(context.Context, string, string) (net.Conn, error) {
+			attempts++
+
+			cancel()
+			return nil, errors.New("temporary dial failure")
+		},
+		3,
+	)
+
+	if _, err := dialContext(ctx, "tcp", "127.0.0.1:443"); err == nil {
+		t.Fatal("retry dial returned nil error, want error")
+	}
+
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+}
+
+func TestRetryDialContext_NormalizesInvalidRetries(t *testing.T) {
+	attempts := 0
+	dialContext := retryDialContext(
+		func(context.Context, string, string) (net.Conn, error) {
+			attempts++
+			return nil, errors.New("dial failed")
+		},
+		0,
+	)
+
+	if _, err := dialContext(context.Background(), "tcp", "127.0.0.1:443"); err == nil {
+		t.Fatal("retry dial returned nil error, want error")
+	}
+
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+}
+
 func newLocalTLSServerOnAddr(t *testing.T, addr string, handler http.Handler) *httptest.Server {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
 	if err != nil {
 		t.Fatalf("failed to listen on %q: %v", addr, err)
 	}
@@ -123,4 +196,48 @@ func mustURLPort(t *testing.T, parsedURL *url.URL) int {
 	}
 
 	return port
+}
+
+type mockConn struct{}
+
+func (*mockConn) Read([]byte) (int, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (*mockConn) Write([]byte) (int, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (*mockConn) Close() error {
+	return nil
+}
+
+func (*mockConn) LocalAddr() net.Addr {
+	return mockAddr("local")
+}
+
+func (*mockConn) RemoteAddr() net.Addr {
+	return mockAddr("remote")
+}
+
+func (*mockConn) SetDeadline(time.Time) error {
+	return nil
+}
+
+func (*mockConn) SetReadDeadline(time.Time) error {
+	return nil
+}
+
+func (*mockConn) SetWriteDeadline(time.Time) error {
+	return nil
+}
+
+type mockAddr string
+
+func (a mockAddr) Network() string {
+	return string(a)
+}
+
+func (a mockAddr) String() string {
+	return string(a)
 }

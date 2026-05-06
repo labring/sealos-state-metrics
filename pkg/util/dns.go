@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -83,11 +84,23 @@ func filterIPsByFamily(ips []string, filter IPFamilyFilter) []string {
 
 // CheckIPReachability checks if an IP is reachable
 func CheckIPReachability(ctx context.Context, ip string, port int, timeout time.Duration) bool {
+	return CheckIPReachabilityWithRetries(ctx, ip, port, timeout, 1)
+}
+
+func CheckIPReachabilityWithRetries(
+	ctx context.Context,
+	ip string,
+	port int,
+	timeout time.Duration,
+	dialRetries int,
+) bool {
 	dialer := &net.Dialer{
 		Timeout: timeout,
 	}
 
-	conn, err := dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", ip, port))
+	dialContext := retryDialContext(dialer.DialContext, dialRetries)
+
+	conn, err := dialContext(ctx, "tcp", net.JoinHostPort(ip, strconv.Itoa(port)))
 	if err != nil {
 		return false
 	}

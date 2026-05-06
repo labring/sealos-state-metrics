@@ -57,6 +57,7 @@ type DomainChecker struct {
 	checkCert   bool
 	includeIPv4 bool
 	includeIPv6 bool
+	dialRetries int
 	classifier  *ErrorClassifier
 }
 
@@ -65,6 +66,7 @@ func NewDomainChecker(
 	timeout time.Duration,
 	checkHTTP, checkDNS, checkCert bool,
 	includeIPv4, includeIPv6 bool,
+	dialRetries int,
 ) *DomainChecker {
 	return &DomainChecker{
 		timeout:     timeout,
@@ -73,6 +75,7 @@ func NewDomainChecker(
 		checkCert:   checkCert,
 		includeIPv4: includeIPv4,
 		includeIPv6: includeIPv6,
+		dialRetries: normalizeDialRetries(dialRetries),
 		classifier:  NewErrorClassifier(),
 	}
 }
@@ -234,6 +237,7 @@ func (dc *DomainChecker) CheckIPs(
 		"includeIPv6":   dc.includeIPv6,
 		"checkHTTP":     dc.checkHTTP,
 		"checkCert":     dc.checkCert,
+		"dialRetries":   dc.dialRetries,
 		"skipTLSVerify": domain.skipTLSVerify,
 	}
 	if domainHealth.UnhealthyIPs > 0 {
@@ -254,7 +258,7 @@ func (dc *DomainChecker) runIPChecks(
 ) {
 	if dc.checkHTTP {
 		health.HTTPChecked = true
-		result := util.CheckHTTPWithIP(
+		result := util.CheckHTTPWithIPAndRetries(
 			ctx,
 			domain.target.Host,
 			domain.target.Port,
@@ -262,6 +266,7 @@ func (dc *DomainChecker) runIPChecks(
 			domain.skipTLSVerify,
 			dc.timeout,
 			domain.followHTTPRedirects,
+			dc.dialRetries,
 		)
 		health.HTTPOk = result.Success
 		health.HTTPError = result.Error
@@ -294,12 +299,13 @@ func (dc *DomainChecker) runIPChecks(
 
 	health.CertChecked = true
 
-	certInfo, certErr := util.GetTLSCertWithIP(
+	certInfo, certErr := util.GetTLSCertWithIPAndRetries(
 		domain.target.Host,
 		domain.target.Port,
 		ip,
 		domain.skipTLSVerify,
 		dc.timeout,
+		dc.dialRetries,
 	)
 	if certErr != nil {
 		health.CertOk = false

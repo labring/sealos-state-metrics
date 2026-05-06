@@ -148,6 +148,7 @@ collectors:
     domains: []
     checkTimeout: "15s"
     checkInterval: "1m"
+    dialRetries: 3
     includeIPv4: true
     includeIPv6: true
     includeCertCheck: true

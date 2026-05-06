@@ -17,6 +17,10 @@ func TestNewDefaultConfig(t *testing.T) {
 		t.Fatalf("CheckInterval = %v, want 1m", cfg.CheckInterval)
 	}
 
+	if cfg.DialRetries != 3 {
+		t.Fatalf("DialRetries = %d, want 3", cfg.DialRetries)
+	}
+
 	if !cfg.IncludeIPv4 {
 		t.Fatal("IncludeIPv4 = false, want true")
 	}
@@ -137,6 +141,7 @@ func TestNewRuntimeConfig(t *testing.T) {
 		},
 		CheckTimeout:     7 * time.Second,
 		CheckInterval:    11 * time.Minute,
+		DialRetries:      5,
 		IncludeCertCheck: true,
 		IncludeHTTPCheck: false,
 		IncludeIPv4:      true,
@@ -181,6 +186,10 @@ func TestNewRuntimeConfig(t *testing.T) {
 		t.Fatalf("checkInterval = %v, want %v", runtimeCfg.checkInterval, 11*time.Minute)
 	}
 
+	if runtimeCfg.dialRetries != 5 {
+		t.Fatalf("dialRetries = %d, want 5", runtimeCfg.dialRetries)
+	}
+
 	if !runtimeCfg.includeCertCheck {
 		t.Fatal("includeCertCheck = false, want true")
 	}
@@ -195,6 +204,20 @@ func TestNewRuntimeConfig(t *testing.T) {
 
 	if runtimeCfg.includeIPv6 {
 		t.Fatal("includeIPv6 = true, want false")
+	}
+}
+
+func TestNewRuntimeConfig_NormalizesDialRetries(t *testing.T) {
+	cfg := NewDefaultConfig()
+	cfg.DialRetries = 0
+
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		t.Fatalf("newRuntimeConfig() returned error: %v", err)
+	}
+
+	if runtimeCfg.dialRetries != 1 {
+		t.Fatalf("dialRetries = %d, want 1", runtimeCfg.dialRetries)
 	}
 }
 

@@ -187,7 +187,11 @@ func TestStartStopCollector(t *testing.T) {
 		t.Fatalf("StartCollector failed: %v", err)
 	}
 
-	mc := r.collectors["leader"].(*mockCollector)
+	mc, ok := r.collectors["leader"].(*mockCollector)
+	if !ok {
+		t.Fatalf("collector leader has type %T, want *mockCollector", r.collectors["leader"])
+	}
+
 	if mc.startCount != 1 {
 		t.Fatalf("expected start count 1, got %d", mc.startCount)
 	}

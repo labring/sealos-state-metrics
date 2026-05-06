@@ -21,11 +21,11 @@ type RedisConnectionInfo struct {
 // checkRedisConnectivity checks Redis database connectivity
 func (c *Collector) checkRedisConnectivity(
 	ctx context.Context,
-	namespace, dbName string,
+	namespace string,
 	secret *corev1.Secret,
 ) error {
 	// 1. Parse connection information
-	connInfo, err := c.parseRedisConnectionInfo(secret, namespace, dbName)
+	connInfo, err := c.parseRedisConnectionInfo(secret, namespace)
 	if err != nil {
 		return fmt.Errorf("failed to parse connection info: %w", err)
 	}
@@ -52,7 +52,7 @@ func (c *Collector) checkRedisConnectivity(
 // parseRedisConnectionInfo parses connection information from secret
 func (c *Collector) parseRedisConnectionInfo(
 	secret *corev1.Secret,
-	namespace, dbName string,
+	namespace string,
 ) (*RedisConnectionInfo, error) {
 	// Extract password
 	password, err := decodeSecret(secret.Data, "password")

@@ -577,9 +577,9 @@ func (c *Collector) checkDatabaseConnectivity(
 	case DatabaseTypePostgreSQL:
 		err = c.checkPostgreSQLConnectivity(checkCtx, namespace, secret)
 	case DatabaseTypeMongoDB:
-		err = c.checkMongoDBConnectivity(checkCtx, namespace, dbName, secret)
+		err = c.checkMongoDBConnectivity(checkCtx, namespace, secret)
 	case DatabaseTypeRedis:
-		err = c.checkRedisConnectivity(checkCtx, namespace, dbName, secret)
+		err = c.checkRedisConnectivity(checkCtx, namespace, secret)
 	default:
 		err = nil
 	}

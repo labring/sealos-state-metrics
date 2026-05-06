@@ -36,6 +36,7 @@ type runtimeConfig struct {
 	domains          []monitoredDomain
 	checkTimeout     time.Duration
 	checkInterval    time.Duration
+	dialRetries      int
 	includeCertCheck bool
 	includeHTTPCheck bool
 	includeIPv4      bool
@@ -60,11 +61,20 @@ func newRuntimeConfig(cfg *Config) (*runtimeConfig, error) {
 		domains:          domains,
 		checkTimeout:     cfg.CheckTimeout,
 		checkInterval:    cfg.CheckInterval,
+		dialRetries:      normalizeDialRetries(cfg.DialRetries),
 		includeCertCheck: cfg.IncludeCertCheck,
 		includeHTTPCheck: cfg.IncludeHTTPCheck,
 		includeIPv4:      cfg.IncludeIPv4,
 		includeIPv6:      cfg.IncludeIPv6,
 	}, nil
+}
+
+func normalizeDialRetries(retries int) int {
+	if retries < 1 {
+		return 1
+	}
+
+	return retries
 }
 
 func parseMonitoredDomains(values []any) ([]monitoredDomain, error) {
