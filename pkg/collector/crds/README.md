@@ -1,5 +1,7 @@
 # CRDs Collector
 
+For the implementation details of the derived metric cache refactor, see [REFACTOR.md](REFACTOR.md).
+
 The CRDs (Custom Resource Definitions) collector enables dynamic monitoring of any Kubernetes Custom Resource without code modifications. This is one of the most powerful features of Sealos State Metrics, allowing you to monitor application-specific resources through simple configuration changes.
 
 ## Overview
