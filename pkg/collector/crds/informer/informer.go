@@ -105,7 +105,7 @@ func NewInformer(
 }
 
 // Start starts the Informer and begins watching resources.
-func (i *Informer) Start(ctx context.Context) error {
+func (i *Informer) Start() error {
 	if i.started {
 		return errors.New("informer already started")
 	}
@@ -135,20 +135,8 @@ func (i *Informer) Start(ctx context.Context) error {
 	i.informerStopCh = make(chan struct{})
 	go i.informer.Run(i.informerStopCh)
 
-	// Wait for cache sync
-	i.logger.Info("Waiting for informer cache to sync")
-
-	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
-		close(i.informerStopCh)
-		i.informerStopCh = nil
-		return errors.New("failed to sync informer cache")
-	}
-
 	i.started = true
-	i.logger.Info("Dynamic informer started and cache synced successfully")
-
-	// Log initial statistics
-	i.logInitialStats()
+	i.logger.Info("Dynamic informer started")
 
 	return nil
 }
@@ -363,21 +351,6 @@ func (i *Informer) extractUnstructured(obj any) *unstructured.Unstructured {
 		Error("Failed to extract Unstructured from object")
 
 	return nil
-}
-
-// logInitialStats logs initial statistics.
-func (i *Informer) logInitialStats() {
-	storeLen := i.store.Len()
-
-	cacheLen := 0
-	if i.informer != nil && i.informer.GetStore() != nil {
-		cacheLen = len(i.informer.GetStore().List())
-	}
-
-	i.logger.WithFields(log.Fields{
-		"store_count": storeLen,
-		"cache_count": cacheLen,
-	}).Info("Initial sync completed")
 }
 
 // GetResourceCount returns the number of currently watched resources.

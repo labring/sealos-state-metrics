@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 const collectorName = "crds"
@@ -128,12 +129,34 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	// 8. Set lifecycle hooks
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
-			// Start all crdCollector informer to collect
+			syncFuncs := make([]cache.InformerSynced, 0, len(c.crdCollectors))
+			startedCollectors := make([]*CrdCollector, 0, len(c.crdCollectors))
+			stopStartedInformers := func() {
+				for _, crdCollector := range startedCollectors {
+					if err := crdCollector.informer.Stop(); err != nil {
+						c.logger.WithError(err).Warn("Failed to stop CRD informer")
+					}
+				}
+			}
+
+			// Start all informers first so initial cache sync can run in parallel.
 			for _, crdCollector := range c.crdCollectors {
-				err := crdCollector.informer.Start(ctx)
-				if err != nil {
+				if err := crdCollector.informer.Start(); err != nil {
+					stopStartedInformers()
+
 					return err
 				}
+
+				startedCollectors = append(startedCollectors, crdCollector)
+				syncFuncs = append(syncFuncs, crdCollector.informer.HasSynced)
+			}
+
+			c.logger.Info("Waiting for CRD informer caches to sync")
+
+			if !cache.WaitForCacheSync(ctx.Done(), syncFuncs...) {
+				stopStartedInformers()
+
+				return errors.New("failed to sync CRD informer caches")
 			}
 
 			c.SetReady()
