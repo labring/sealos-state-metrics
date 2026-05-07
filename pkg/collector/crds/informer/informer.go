@@ -259,6 +259,7 @@ func copyNestedField(src, dst map[string]any, path string) {
 	}
 
 	parts := strings.Split(path, ".")
+
 	value, found, err := unstructured.NestedFieldCopy(src, parts...)
 	if err != nil || !found {
 		return
@@ -273,6 +274,7 @@ func (i *Informer) factoryNamespace() string {
 		if namespace == "" {
 			continue
 		}
+
 		namespaces = append(namespaces, namespace)
 	}
 

@@ -1,7 +1,9 @@
 package crds
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -74,7 +76,7 @@ func newMetricStore(
 	logger *log.Entry,
 ) (*metricStore, error) {
 	if crdConfig == nil {
-		return nil, fmt.Errorf("crd config cannot be nil")
+		return nil, errors.New("crd config cannot be nil")
 	}
 
 	if metricPrefix == "" {
@@ -131,7 +133,8 @@ func compileMetric(
 		compiled.labelPaths = helpers.GetSortedValues(metricCfg.Labels)
 	case "gauge":
 	case "count":
-		labelNames = []string{labelOrDefault(metricCfg.ValueLabel, defaultValueLabel)}
+		labelNames = make([]string, 1, len(commonLabelNames)+len(metricCfg.Labels)+3)
+		labelNames[0] = labelOrDefault(metricCfg.ValueLabel, defaultValueLabel)
 	case "string_state":
 		labelNames = append(labelNames, labelOrDefault(metricCfg.ValueLabel, defaultStateLabel))
 	case "map_state":
@@ -146,14 +149,17 @@ func compileMetric(
 		labelNames = append(labelNames, "type", "status", "reason")
 		compiled.typeField = "type"
 		compiled.statusField = "status"
+
 		compiled.reasonField = "reason"
 		if metricCfg.Condition != nil {
 			if metricCfg.Condition.TypeField != "" {
 				compiled.typeField = metricCfg.Condition.TypeField
 			}
+
 			if metricCfg.Condition.StatusField != "" {
 				compiled.statusField = metricCfg.Condition.StatusField
 			}
+
 			if metricCfg.Condition.ReasonField != "" {
 				compiled.reasonField = metricCfg.Condition.ReasonField
 			}
@@ -212,9 +218,7 @@ func (s *metricStore) snapshotMetrics() []prometheus.Metric {
 
 	metrics := make([]prometheus.Metric, 0, s.metricCountLocked())
 	for _, objectMetrics := range s.objects {
-		for _, metric := range objectMetrics.series {
-			metrics = append(metrics, metric)
-		}
+		metrics = append(metrics, objectMetrics.series...)
 	}
 
 	for _, metricsByValue := range s.countMetrics {
@@ -231,6 +235,7 @@ func (s *metricStore) metricCountLocked() int {
 	for _, objectMetrics := range s.objects {
 		count += len(objectMetrics.series)
 	}
+
 	for _, metricsByValue := range s.countMetrics {
 		count += len(metricsByValue)
 	}
@@ -247,9 +252,7 @@ func (s *metricStore) Len() int {
 
 func (s *metricStore) Descriptors() map[string]*prometheus.Desc {
 	descriptors := make(map[string]*prometheus.Desc, len(s.descriptors))
-	for name, desc := range s.descriptors {
-		descriptors[name] = desc
-	}
+	maps.Copy(descriptors, s.descriptors)
 
 	return descriptors
 }
@@ -271,9 +274,11 @@ func (s *metricStore) RequiredPaths() []string {
 		if path == "" {
 			return
 		}
+
 		if _, ok := seen[path]; ok {
 			return
 		}
+
 		seen[path] = struct{}{}
 		paths = append(paths, path)
 	}
@@ -284,6 +289,7 @@ func (s *metricStore) RequiredPaths() []string {
 
 	for _, metric := range s.metrics {
 		addPath(metric.config.Path)
+
 		for _, path := range metric.labelPaths {
 			addPath(path)
 		}
@@ -354,13 +360,22 @@ func (s *metricStore) buildObjectMetrics(obj *unstructured.Unstructured) (object
 				})
 			}
 		case "string_state":
-			result.series = append(result.series, s.buildStringStateMetric(obj, metric, commonLabels))
+			result.series = append(
+				result.series,
+				s.buildStringStateMetric(obj, metric, commonLabels),
+			)
 		case "map_state":
-			result.series = append(result.series, s.buildMapStateMetrics(obj, metric, commonLabels)...)
+			result.series = append(
+				result.series,
+				s.buildMapStateMetrics(obj, metric, commonLabels)...)
 		case "map_gauge":
-			result.series = append(result.series, s.buildMapGaugeMetrics(obj, metric, commonLabels)...)
+			result.series = append(
+				result.series,
+				s.buildMapGaugeMetrics(obj, metric, commonLabels)...)
 		case "conditions":
-			result.series = append(result.series, s.buildConditionMetrics(obj, metric, commonLabels)...)
+			result.series = append(
+				result.series,
+				s.buildConditionMetrics(obj, metric, commonLabels)...)
 		}
 	}
 
@@ -488,6 +503,7 @@ func (s *metricStore) buildConditionMetrics(
 		condType, _ := condMap[metric.typeField].(string)
 		condStatus, _ := condMap[metric.statusField].(string)
 		condReason, _ := condMap[metric.reasonField].(string)
+
 		if condType == "" {
 			continue
 		}
@@ -534,6 +550,7 @@ func (s *metricStore) addCountLocked(metricName, value string) {
 	if s.countValues[metricName] == nil {
 		s.countValues[metricName] = make(map[string]int)
 	}
+
 	if s.countMetrics[metricName] == nil {
 		s.countMetrics[metricName] = make(map[string]prometheus.Metric)
 	}
@@ -579,11 +596,13 @@ func (s *metricStore) namespaceAllowed(namespace string) bool {
 	}
 
 	_, ok := s.namespaces[namespace]
+
 	return ok
 }
 
 func resourceKey(obj *unstructured.Unstructured) string {
 	namespace := obj.GetNamespace()
+
 	name := obj.GetName()
 	if namespace == "" {
 		return name
@@ -598,6 +617,7 @@ func makeNamespaceSet(namespaces []string) map[string]struct{} {
 		if namespace == "" {
 			continue
 		}
+
 		result[namespace] = struct{}{}
 	}
 

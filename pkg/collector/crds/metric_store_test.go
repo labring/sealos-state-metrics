@@ -1,4 +1,4 @@
-package crds
+package crds //nolint:testpackage // Tests exercise unexported metricStore state directly.
 
 import (
 	"testing"
@@ -52,6 +52,7 @@ func TestMetricStoreUpdatesDerivedMetrics(t *testing.T) {
 
 	first := newTestCR("default", "first", "Running", 1)
 	second := newTestCR("default", "second", "Pending", 2)
+
 	store.Add(first)
 	store.Add(second)
 
@@ -112,6 +113,7 @@ func assertCountMetric(t *testing.T, store *metricStore, phase string, want floa
 	if !found {
 		t.Fatalf("count metric for %q not found", phase)
 	}
+
 	if got != want {
 		t.Fatalf("count metric for %q = %v, want %v", phase, got, want)
 	}
@@ -128,13 +130,13 @@ func findCountMetricValue(store *metricStore, phase string) (float64, bool) {
 			continue
 		}
 
-		if len(dtoMetric.Label) != 1 || dtoMetric.Gauge == nil {
+		if len(dtoMetric.GetLabel()) != 1 || dtoMetric.GetGauge() == nil {
 			continue
 		}
 
-		if dtoMetric.Label[0].GetName() == defaultValueLabel &&
-			dtoMetric.Label[0].GetValue() == phase {
-			return dtoMetric.Gauge.GetValue(), true
+		if dtoMetric.GetLabel()[0].GetName() == defaultValueLabel &&
+			dtoMetric.GetLabel()[0].GetValue() == phase {
+			return dtoMetric.GetGauge().GetValue(), true
 		}
 	}
 

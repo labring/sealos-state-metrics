@@ -78,7 +78,11 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			factoryCtx.Logger.WithField("crd", crdCfg.Name),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to initialize metric store for CRD %s: %w", crdCfg.Name, err)
+			return nil, fmt.Errorf(
+				"failed to initialize metric store for CRD %s: %w",
+				crdCfg.Name,
+				err,
+			)
 		}
 
 		informerConfig := informer.InformerConfig{
