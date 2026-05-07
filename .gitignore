@@ -13,3 +13,4 @@
 /.idea/vcs.xml
 /sealos-state-metrics
 /sealos-state-metrics.*
+/pkg/collector/crds/REFACTOR.md
