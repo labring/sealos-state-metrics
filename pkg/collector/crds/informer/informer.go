@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/labring/sealos-state-metrics/pkg/collector/crds/store"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -16,8 +16,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// ResourceEventStore receives informer resource events.
+type ResourceEventStore interface {
+	Add(obj *unstructured.Unstructured)
+	Update(obj *unstructured.Unstructured)
+	Delete(obj *unstructured.Unstructured)
+	Len() int
+}
+
 // Informer watches Kubernetes resources.
-// Responsibilities: Monitors K8s API resource changes and syncs to ResourceStore.
+// Responsibilities: Monitors K8s API resource changes and syncs derived state.
 type Informer struct {
 	// Kubernetes related
 	config        *InformerConfig
@@ -29,7 +37,7 @@ type Informer struct {
 	started        bool
 
 	// Storage layer reference (core dependency)
-	store *store.ResourceStore
+	store ResourceEventStore
 
 	// Logger instance
 	logger *log.Entry
@@ -42,18 +50,24 @@ type InformerConfig struct {
 
 	// Resync period
 	ResyncPeriod time.Duration
+
+	// Namespaces restricts the watched namespaces. Empty means all namespaces.
+	Namespaces []string
+
+	// TransformPaths defines fields to keep in the informer cache.
+	TransformPaths []string
 }
 
 // NewInformer creates a new Informer.
 // Parameters:
 //   - dynamicClient: Kubernetes dynamic client
 //   - config: Informer configuration
-//   - resourceStore: Resource storage layer (dependency injection)
+//   - resourceStore: Resource event storage layer (dependency injection)
 //   - logger: Logger instance
 func NewInformer(
 	dynamicClient dynamic.Interface,
 	config *InformerConfig,
-	resourceStore *store.ResourceStore,
+	resourceStore ResourceEventStore,
 	logger *log.Entry,
 ) (*Informer, error) {
 	// Validate parameters
@@ -91,20 +105,29 @@ func NewInformer(
 }
 
 // Start starts the Informer and begins watching resources.
-func (i *Informer) Start(ctx context.Context) error {
+func (i *Informer) Start() error {
 	if i.started {
 		return errors.New("informer already started")
 	}
 
 	i.logger.Info("Starting dynamic informer")
 
-	factory := dynamicinformer.NewDynamicSharedInformerFactory(
+	namespace := i.factoryNamespace()
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 		i.dynamicClient,
 		i.config.ResyncPeriod,
+		namespace,
+		nil,
 	)
-	i.logger.Debug("Created cluster-scoped informer factory")
+	i.logger.WithField("namespace", namespace).Debug("Created dynamic informer factory")
 
 	i.informer = factory.ForResource(i.config.GVR).Informer()
+	if len(i.config.TransformPaths) > 0 {
+		if err := i.informer.SetTransform(i.transformObject); err != nil {
+			return fmt.Errorf("failed to set informer transform: %w", err)
+		}
+	}
+
 	if err := i.registerEventHandlers(); err != nil {
 		return fmt.Errorf("failed to register event handlers: %w", err)
 	}
@@ -112,20 +135,8 @@ func (i *Informer) Start(ctx context.Context) error {
 	i.informerStopCh = make(chan struct{})
 	go i.informer.Run(i.informerStopCh)
 
-	// Wait for cache sync
-	i.logger.Info("Waiting for informer cache to sync")
-
-	if !cache.WaitForCacheSync(ctx.Done(), i.informer.HasSynced) {
-		close(i.informerStopCh)
-		i.informerStopCh = nil
-		return errors.New("failed to sync informer cache")
-	}
-
 	i.started = true
-	i.logger.Info("Dynamic informer started and cache synced successfully")
-
-	// Log initial statistics
-	i.logInitialStats()
+	i.logger.Info("Dynamic informer started")
 
 	return nil
 }
@@ -164,7 +175,7 @@ func (i *Informer) IsStarted() bool {
 }
 
 // GetStore returns the internal cache.Store (for debugging).
-// Note: Direct use is not recommended; data should be accessed through ResourceStore.
+// Note: Direct use is not recommended; data should be accessed through the derived store.
 func (i *Informer) GetStore() cache.Store {
 	if i.informer == nil {
 		return nil
@@ -210,6 +221,58 @@ func (i *Informer) registerEventHandlers() error {
 	return nil
 }
 
+func (i *Informer) transformObject(obj any) (any, error) {
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return obj, nil
+	}
+
+	transformed := &unstructured.Unstructured{Object: make(map[string]any)}
+	transformed.SetName(u.GetName())
+	transformed.SetNamespace(u.GetNamespace())
+	transformed.SetUID(u.GetUID())
+	transformed.SetResourceVersion(u.GetResourceVersion())
+	transformed.SetGeneration(u.GetGeneration())
+
+	for _, path := range i.config.TransformPaths {
+		copyNestedField(u.Object, transformed.Object, path)
+	}
+
+	return transformed, nil
+}
+
+func copyNestedField(src, dst map[string]any, path string) {
+	if path == "" {
+		return
+	}
+
+	parts := strings.Split(path, ".")
+
+	value, found, err := unstructured.NestedFieldCopy(src, parts...)
+	if err != nil || !found {
+		return
+	}
+
+	_ = unstructured.SetNestedField(dst, value, parts...)
+}
+
+func (i *Informer) factoryNamespace() string {
+	namespaces := make([]string, 0, len(i.config.Namespaces))
+	for _, namespace := range i.config.Namespaces {
+		if namespace == "" {
+			continue
+		}
+
+		namespaces = append(namespaces, namespace)
+	}
+
+	if len(namespaces) == 1 {
+		return namespaces[0]
+	}
+
+	return ""
+}
+
 // handleAdd handles resource add events.
 func (i *Informer) handleAdd(obj *unstructured.Unstructured) {
 	i.logger.WithFields(log.Fields{
@@ -218,7 +281,7 @@ func (i *Informer) handleAdd(obj *unstructured.Unstructured) {
 		"uid":       obj.GetUID(),
 	}).Debug("Resource added")
 
-	// Write directly to ResourceStore
+	// Write directly to the derived store.
 	i.store.Add(obj)
 }
 
@@ -242,7 +305,7 @@ func (i *Informer) handleUpdate(oldObj, newObj *unstructured.Unstructured) {
 		"new_version": newObj.GetResourceVersion(),
 	}).Debug("Resource updated")
 
-	// Write directly to ResourceStore
+	// Write directly to the derived store.
 	i.store.Update(newObj)
 }
 
@@ -254,7 +317,7 @@ func (i *Informer) handleDelete(obj *unstructured.Unstructured) {
 		"uid":       obj.GetUID(),
 	}).Debug("Resource deleted")
 
-	// Delete from ResourceStore
+	// Delete from the derived store.
 	i.store.Delete(obj)
 }
 
@@ -290,21 +353,6 @@ func (i *Informer) extractUnstructured(obj any) *unstructured.Unstructured {
 	return nil
 }
 
-// logInitialStats logs initial statistics.
-func (i *Informer) logInitialStats() {
-	storeLen := i.store.Len()
-
-	cacheLen := 0
-	if i.informer != nil && i.informer.GetStore() != nil {
-		cacheLen = len(i.informer.GetStore().List())
-	}
-
-	i.logger.WithFields(log.Fields{
-		"store_count": storeLen,
-		"cache_count": cacheLen,
-	}).Info("Initial sync completed")
-}
-
 // GetResourceCount returns the number of currently watched resources.
 func (i *Informer) GetResourceCount() int {
 	return i.store.Len()
@@ -317,14 +365,9 @@ func (i *Informer) LogStats() {
 		return
 	}
 
-	metrics := i.store.GetMetrics()
-
 	i.logger.WithFields(log.Fields{
-		"synced":       i.HasSynced(),
-		"store_count":  metrics.TotalCount,
-		"add_count":    metrics.AddCount,
-		"update_count": metrics.UpdateCount,
-		"delete_count": metrics.DeleteCount,
+		"synced":      i.HasSynced(),
+		"store_count": i.store.Len(),
 	}).Info("Informer statistics")
 }
 

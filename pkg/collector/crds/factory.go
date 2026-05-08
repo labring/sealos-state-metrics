@@ -8,11 +8,11 @@ import (
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/collector/base"
 	"github.com/labring/sealos-state-metrics/pkg/collector/crds/informer"
-	"github.com/labring/sealos-state-metrics/pkg/collector/crds/store"
 	"github.com/labring/sealos-state-metrics/pkg/registry"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 )
 
 const collectorName = "crds"
@@ -73,23 +73,34 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 			return nil, fmt.Errorf("CRD config %s: gvr.resource is required", crdCfg.Name)
 		}
 
-		resourceStore := store.NewResourceStore(
+		metricStore, err := newMetricStore(
+			crdCfg,
+			"",
 			factoryCtx.Logger.WithField("crd", crdCfg.Name),
-			nil,
 		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to initialize metric store for CRD %s: %w",
+				crdCfg.Name,
+				err,
+			)
+		}
+
 		informerConfig := informer.InformerConfig{
 			GVR: schema.GroupVersionResource{
 				Group:    crdCfg.GVR.Group,
 				Resource: crdCfg.GVR.Resource,
 				Version:  crdCfg.GVR.Version,
 			},
-			ResyncPeriod: crdCfg.ResyncPeriod,
+			ResyncPeriod:   crdCfg.ResyncPeriod,
+			Namespaces:     crdCfg.Namespaces,
+			TransformPaths: metricStore.RequiredPaths(),
 		}
 
 		i, err := informer.NewInformer(
 			dynamicClient,
 			&informerConfig,
-			resourceStore,
+			metricStore,
 			factoryCtx.Logger.WithField("crd", crdCfg.Name),
 		)
 		if err != nil {
@@ -98,7 +109,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 
 		crdCollector, err := NewCrdCollector(
 			crdCfg,
-			resourceStore,
+			metricStore,
 			i,
 			"",
 			factoryCtx.Logger.WithField("crd", crdCfg.Name),
@@ -118,12 +129,34 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	// 8. Set lifecycle hooks
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
-			// Start all crdCollector informer to collect
+			syncFuncs := make([]cache.InformerSynced, 0, len(c.crdCollectors))
+			startedCollectors := make([]*CrdCollector, 0, len(c.crdCollectors))
+			stopStartedInformers := func() {
+				for _, crdCollector := range startedCollectors {
+					if err := crdCollector.informer.Stop(); err != nil {
+						c.logger.WithError(err).Warn("Failed to stop CRD informer")
+					}
+				}
+			}
+
+			// Start all informers first so initial cache sync can run in parallel.
 			for _, crdCollector := range c.crdCollectors {
-				err := crdCollector.informer.Start(ctx)
-				if err != nil {
+				if err := crdCollector.informer.Start(); err != nil {
+					stopStartedInformers()
+
 					return err
 				}
+
+				startedCollectors = append(startedCollectors, crdCollector)
+				syncFuncs = append(syncFuncs, crdCollector.informer.HasSynced)
+			}
+
+			c.logger.Info("Waiting for CRD informer caches to sync")
+
+			if !cache.WaitForCacheSync(ctx.Done(), syncFuncs...) {
+				stopStartedInformers()
+
+				return errors.New("failed to sync CRD informer caches")
 			}
 
 			c.SetReady()
