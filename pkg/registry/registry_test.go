@@ -176,6 +176,54 @@ func TestReinitializeClearsFailedCollectors(t *testing.T) {
 	}
 }
 
+func TestCreateCollectorsDecodesDurationModuleConfig(t *testing.T) {
+	type testConfig struct {
+		CheckTimeout time.Duration `yaml:"checkTimeout"`
+	}
+
+	r := &Registry{
+		factories:        make(map[string]collector.Factory),
+		collectors:       make(map[string]collector.Collector),
+		failedCollectors: make(map[string]error),
+	}
+
+	r.factories["test"] = func(ctx *collector.FactoryContext) (collector.Collector, error) {
+		cfg := &testConfig{}
+		if err := ctx.ConfigLoader.LoadModuleConfig("collectors.test", cfg); err != nil {
+			return nil, err
+		}
+
+		if cfg.CheckTimeout != 30*time.Second {
+			return nil, fmt.Errorf("checkTimeout = %v, want 30s", cfg.CheckTimeout)
+		}
+
+		return &mockCollector{name: "test"}, nil
+	}
+
+	cfg := &InitConfig{
+		Ctx: context.Background(),
+		ConfigContent: []byte(`
+collectors:
+  test:
+    checkTimeout: "30s"
+`),
+		Identity:             "test",
+		NodeName:             "test-node",
+		PodName:              "test-pod",
+		InformerResyncPeriod: 5 * time.Minute,
+		EnabledCollectors:    []string{"test"},
+	}
+
+	r.createCollectors(cfg, "Testing")
+
+	if _, exists := r.collectors["test"]; !exists {
+		t.Fatalf(
+			"expected test collector to be created, failed collectors: %v",
+			r.GetFailedCollectors(),
+		)
+	}
+}
+
 func TestStartStopCollector(t *testing.T) {
 	r := &Registry{
 		collectors: map[string]collector.Collector{

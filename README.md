@@ -98,7 +98,7 @@ collectors:
       - endpoint: example.com
         skipTLSVerify: false
     checkInterval: "1m"
-    checkTimeout: "15s"
+    checkTimeout: "30s"
     dialRetries: 3
     includeIPv4: true
     includeIPv6: true
@@ -238,7 +238,7 @@ collectors:
         skipTLSVerify: true
       - api.example.com
     checkInterval: "1m"
-    checkTimeout: "15s"
+    checkTimeout: "30s"
     dialRetries: 3
     includeIPv4: true
     includeIPv6: true
@@ -878,7 +878,7 @@ kubernetes:
 collectors:
   domain:
     checkInterval: "1m"   # Default
-    checkTimeout: "15s"   # Default
+    checkTimeout: "30s"   # Default
     dialRetries: 3        # Default
 
   database:

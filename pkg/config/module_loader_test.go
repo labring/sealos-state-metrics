@@ -242,7 +242,7 @@ collectors:
         skipTLSVerify: false
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
-    checkTimeout: "15s"
+    checkTimeout: "30s"
 `
 
 	tmpFile := createTempYAML(t, yamlContent)
@@ -287,8 +287,8 @@ collectors:
 		t.Fatalf("second skipTLSVerify = %v, want true", second["skipTLSVerify"])
 	}
 
-	if cfg.CheckTimeout != 15*time.Second {
-		t.Fatalf("checkTimeout = %v, want 15s", cfg.CheckTimeout)
+	if cfg.CheckTimeout != 30*time.Second {
+		t.Fatalf("checkTimeout = %v, want 30s", cfg.CheckTimeout)
 	}
 }
 

@@ -126,10 +126,11 @@ collectors:
     #   - api.example.com
     #   - www.example.com
     # Check timeout for each domain
-    checkTimeout: "15s"
+    checkTimeout: "30s"
     # Check interval (how often to check all domains)
     checkInterval: "1m"
-    # Number of dial attempts for HTTP and certificate checks
+    # Number of connection attempts for HTTP and certificate checks.
+    # HTTPS retries include both TCP dial and TLS handshake.
     dialRetries: 3
     # Include IPv4 addresses resolved from DNS
     includeIPv4: true

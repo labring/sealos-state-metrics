@@ -146,7 +146,7 @@ identity: ""
 collectors:
   domain:
     domains: []
-    checkTimeout: "15s"
+    checkTimeout: "30s"
     checkInterval: "1m"
     dialRetries: 3
     includeIPv4: true

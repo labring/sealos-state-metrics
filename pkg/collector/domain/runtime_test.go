@@ -9,8 +9,8 @@ import (
 func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
 
-	if cfg.CheckTimeout != 15*time.Second {
-		t.Fatalf("CheckTimeout = %v, want 15s", cfg.CheckTimeout)
+	if cfg.CheckTimeout != 30*time.Second {
+		t.Fatalf("CheckTimeout = %v, want 30s", cfg.CheckTimeout)
 	}
 
 	if cfg.CheckInterval != time.Minute {
@@ -235,7 +235,7 @@ func TestNewRuntimeConfig_ObjectDomains(t *testing.T) {
 				"followHTTPRedirects": true,
 			},
 		},
-		CheckTimeout:     15 * time.Second,
+		CheckTimeout:     30 * time.Second,
 		CheckInterval:    time.Minute,
 		IncludeCertCheck: true,
 		IncludeHTTPCheck: true,
@@ -278,7 +278,7 @@ func TestNewRuntimeConfig_MixedDomains(t *testing.T) {
 			},
 			"api.example.com",
 		},
-		CheckTimeout:     15 * time.Second,
+		CheckTimeout:     30 * time.Second,
 		CheckInterval:    time.Minute,
 		IncludeCertCheck: true,
 		IncludeHTTPCheck: true,

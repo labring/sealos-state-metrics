@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -98,6 +99,52 @@ func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
 
 	if result.StatusCode != http.StatusFound {
 		t.Fatalf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusFound)
+	}
+}
+
+func TestCheckHTTPWithIPAndRetries_RetriesTLSHandshakeFailure(t *testing.T) {
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	flakyListener := &dropFirstAcceptedConnListener{Listener: listener}
+	origin := httptest.NewUnstartedServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+	origin.Listener = flakyListener
+
+	origin.StartTLS()
+	defer origin.Close()
+
+	originURL, err := url.Parse(origin.URL)
+	if err != nil {
+		t.Fatalf("failed to parse origin URL: %v", err)
+	}
+
+	result := CheckHTTPWithIPAndRetries(
+		context.Background(),
+		originURL.Hostname(),
+		mustURLPort(t, originURL),
+		originURL.Hostname(),
+		true,
+		5*time.Second,
+		true,
+		2,
+	)
+
+	if !result.Success {
+		t.Fatalf("CheckHTTPWithIPAndRetries() failed: %#v", result)
+	}
+
+	if result.StatusCode != http.StatusNoContent {
+		t.Fatalf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusNoContent)
+	}
+
+	if !flakyListener.dropped.Load() {
+		t.Fatal("expected listener to drop the first accepted connection")
 	}
 }
 
@@ -196,6 +243,24 @@ func mustURLPort(t *testing.T, parsedURL *url.URL) int {
 	}
 
 	return port
+}
+
+type dropFirstAcceptedConnListener struct {
+	net.Listener
+	dropped atomic.Bool
+}
+
+func (l *dropFirstAcceptedConnListener) Accept() (net.Conn, error) {
+	conn, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+
+	if l.dropped.CompareAndSwap(false, true) {
+		_ = conn.Close()
+	}
+
+	return conn, nil
 }
 
 type mockConn struct{}
