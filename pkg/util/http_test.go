@@ -109,10 +109,13 @@ func TestCheckHTTPWithIPAndRetries_RetriesTLSHandshakeFailure(t *testing.T) {
 	}
 
 	flakyListener := &dropFirstAcceptedConnListener{Listener: listener}
-	origin := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
+	origin := httptest.NewUnstartedServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
 	origin.Listener = flakyListener
+
 	origin.StartTLS()
 	defer origin.Close()
 

@@ -217,7 +217,10 @@ collectors:
 	r.createCollectors(cfg, "Testing")
 
 	if _, exists := r.collectors["test"]; !exists {
-		t.Fatalf("expected test collector to be created, failed collectors: %v", r.GetFailedCollectors())
+		t.Fatalf(
+			"expected test collector to be created, failed collectors: %v",
+			r.GetFailedCollectors(),
+		)
 	}
 }
 
