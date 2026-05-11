@@ -116,6 +116,11 @@ func CheckHTTPWithIPAndRetries(
 		Timeout: timeout,
 	}
 	dialContext := retryDialContext(defaultDialer.DialContext, dialRetries)
+	tlsConfig := &tls.Config{
+		//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
+		InsecureSkipVerify: skipTLSVerify,
+		MinVersion:         tls.VersionTLS12,
+	}
 
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -133,11 +138,28 @@ func CheckHTTPWithIPAndRetries(
 
 			return dialContext(ctx, network, addr)
 		},
-		TLSClientConfig: &tls.Config{
-			//nolint:gosec // Domain collector intentionally supports per-target TLS verification bypass.
-			InsecureSkipVerify: skipTLSVerify,
-			MinVersion:         tls.VersionTLS12,
+		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dialHost, dialPort, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			// Keep the IP-pinned dial only for the configured domain. The TLS
+			// handshake stays inside the retry loop so transient handshake errors
+			// are retried together with TCP connection failures.
+			dialTLSContext := retryTLSConnectionContext(
+				defaultDialer,
+				tlsConfig,
+				dialHost,
+				dialRetries,
+			)
+			if sameHostname(dialHost, host) {
+				return dialTLSContext(ctx, network, net.JoinHostPort(ip, dialPort))
+			}
+
+			return dialTLSContext(ctx, network, addr)
 		},
+		TLSClientConfig: tlsConfig,
 	}
 	defer transport.CloseIdleConnections()
 
@@ -369,6 +391,28 @@ func normalizeHostname(host string) string {
 }
 
 type dialContextFunc func(context.Context, string, string) (net.Conn, error)
+
+func retryTLSConnectionContext(
+	netDialer *net.Dialer,
+	tlsConfig *tls.Config,
+	serverName string,
+	retries int,
+) dialContextFunc {
+	return retryDialContext(
+		func(ctx context.Context, network, addr string) (net.Conn, error) {
+			attemptTLSConfig := tlsConfig.Clone()
+			attemptTLSConfig.ServerName = normalizeHostname(serverName)
+
+			tlsDialer := &tls.Dialer{
+				NetDialer: netDialer,
+				Config:    attemptTLSConfig,
+			}
+
+			return tlsDialer.DialContext(ctx, network, addr)
+		},
+		retries,
+	)
+}
 
 func retryDialContext(dialContext dialContextFunc, retries int) dialContextFunc {
 	if retries < 1 {

@@ -121,9 +121,9 @@ The following table lists the configurable parameters of the chart and their def
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `collectors.domain.domains` | List of domains to check. Supports mixed string entries and object entries with `endpoint` and `skipTLSVerify` | `[]` |
-| `collectors.domain.checkTimeout` | HTTP and TLS check timeout | `15s` |
+| `collectors.domain.checkTimeout` | HTTP and TLS check timeout | `30s` |
 | `collectors.domain.checkInterval` | Check interval | `1m` |
-| `collectors.domain.dialRetries` | Number of dial attempts for HTTP and certificate checks | `3` |
+| `collectors.domain.dialRetries` | Number of connection attempts for HTTP and certificate checks. HTTPS attempts include both TCP dial and TLS handshake | `3` |
 | `collectors.domain.includeIPv4` | Include IPv4 addresses returned by DNS | `true` |
 | `collectors.domain.includeIPv6` | Include IPv6 addresses returned by DNS | `true` |
 | `collectors.domain.includeCertCheck` | Include certificate checks | `true` |
@@ -190,7 +190,7 @@ collectors:
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
       - test.com
-    checkTimeout: 15s
+    checkTimeout: 30s
     checkInterval: 1m
     dialRetries: 3
     includeIPv4: true

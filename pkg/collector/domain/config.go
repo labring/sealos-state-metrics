@@ -23,7 +23,7 @@ func NewDefaultConfig() *Config {
 	return &Config{
 		Domains:          []any{},
 		DomainsEnv:       []string{},
-		CheckTimeout:     15 * time.Second,
+		CheckTimeout:     30 * time.Second,
 		CheckInterval:    1 * time.Minute,
 		DialRetries:      3,
 		IncludeCertCheck: true,

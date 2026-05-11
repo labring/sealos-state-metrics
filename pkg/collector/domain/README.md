@@ -26,7 +26,7 @@ collectors:
         skipTLSVerify: true
         followHTTPRedirects: false
       - api.example.com
-    checkTimeout: "15s"
+    checkTimeout: "30s"
     checkInterval: "1m"
     dialRetries: 3
     includeIPv4: true
@@ -48,9 +48,9 @@ collectors:
 | `domains[].endpoint` | string | - | Domain endpoint in `host` or `host:port` format |
 | `domains[].skipTLSVerify` | bool | `false` | Skip TLS certificate verification for this domain during HTTPS and cert checks |
 | `domains[].followHTTPRedirects` | bool | `true` | Follow HTTP redirects for this domain during HTTP checks |
-| `checkTimeout` | duration | `15s` | Timeout for each health check |
+| `checkTimeout` | duration | `30s` | Timeout for each health check |
 | `checkInterval` | duration | `1m` | Interval between check cycles |
-| `dialRetries` | int | `3` | Number of dial attempts for HTTP and certificate checks |
+| `dialRetries` | int | `3` | Number of connection attempts for HTTP and certificate checks. HTTPS attempts include both TCP dial and TLS handshake |
 | `includeIPv4` | bool | `true` | Include IPv4 addresses returned by DNS resolution |
 | `includeIPv6` | bool | `true` | Include IPv6 addresses returned by DNS resolution |
 | `includeCertCheck` | bool | `true` | Enable TLS certificate validation |
