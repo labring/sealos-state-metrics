@@ -11,6 +11,7 @@ import (
 	"github.com/labring/sealos-state-metrics/pkg/collector"
 	"github.com/labring/sealos-state-metrics/pkg/config"
 	"github.com/labring/sealos-state-metrics/pkg/identity"
+	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -146,7 +147,10 @@ func (r *Registry) createCollectors(cfg *InitConfig, action string) {
 	// Create config loader: content -> env (priority: defaults < content < env)
 	configLoader := config.NewWrapConfigLoader()
 	if len(cfg.ConfigContent) > 0 {
-		configLoader.Add(config.NewModuleConfigLoader(cfg.ConfigContent))
+		configLoader.Add(config.NewModuleConfigLoader(
+			cfg.ConfigContent,
+			config.WithModuleDecodeHook(mapstructure.StringToTimeDurationHookFunc()),
+		))
 	}
 
 	configLoader.Add(config.NewEnvConfigLoader())
