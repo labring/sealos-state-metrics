@@ -135,6 +135,7 @@ collectors:
 | **[domain](pkg/collector/domain/)** | Polling | Yes | Domain health checks, TLS certificate expiry, HTTP connectivity, DNS resolution |
 | **[node](pkg/collector/node/)** | Informer | Yes | Kubernetes node conditions (Ready, MemoryPressure, DiskPressure, etc.) |
 | **[database](pkg/collector/database/)** | Polling | Yes | Database connectivity monitoring (MySQL, PostgreSQL, MongoDB, Redis) via KubeBlocks |
+| **[cockroachlicense](pkg/collector/cockroachlicense/)** | Polling | Yes | CockroachDB license metadata and expiry monitoring |
 | **[imagepull](pkg/collector/imagepull/)** | Informer | Yes | Container image pull performance, slow pull detection, pull failure tracking |
 | **[zombie](pkg/collector/zombie/)** | Polling | Yes | Zombie (defunct) process detection in containers |
 | **[lvm](pkg/collector/lvm/)** | Polling | No | LVM storage metrics, volume group capacity and usage (node-level) |
