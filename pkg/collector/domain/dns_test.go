@@ -1,5 +1,5 @@
 //nolint:testpackage // Tests need access to internal DNS family filtering helper.
-package util
+package domain
 
 import (
 	"reflect"
@@ -16,12 +16,12 @@ func TestFilterIPsByFamily(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		filter IPFamilyFilter
+		filter ipFamilyFilter
 		want   []string
 	}{
 		{
 			name: "all families",
-			filter: IPFamilyFilter{
+			filter: ipFamilyFilter{
 				IncludeIPv4: true,
 				IncludeIPv6: true,
 			},
@@ -29,7 +29,7 @@ func TestFilterIPsByFamily(t *testing.T) {
 		},
 		{
 			name: "ipv4 only",
-			filter: IPFamilyFilter{
+			filter: ipFamilyFilter{
 				IncludeIPv4: true,
 				IncludeIPv6: false,
 			},
@@ -37,7 +37,7 @@ func TestFilterIPsByFamily(t *testing.T) {
 		},
 		{
 			name: "ipv6 only",
-			filter: IPFamilyFilter{
+			filter: ipFamilyFilter{
 				IncludeIPv4: false,
 				IncludeIPv6: true,
 			},
@@ -45,7 +45,7 @@ func TestFilterIPsByFamily(t *testing.T) {
 		},
 		{
 			name: "disabled all",
-			filter: IPFamilyFilter{
+			filter: ipFamilyFilter{
 				IncludeIPv4: false,
 				IncludeIPv6: false,
 			},

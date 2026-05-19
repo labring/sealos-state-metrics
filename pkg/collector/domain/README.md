@@ -25,6 +25,11 @@ collectors:
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
         followHTTPRedirects: false
+        path: /healthz?ready=true
+        method: GET
+        headers:
+          X-Probe: sealos-state-metrics
+        expectedStatusCodes: [200, 204]
       - api.example.com
     checkTimeout: "30s"
     checkInterval: "1m"
@@ -38,7 +43,7 @@ collectors:
 `domains` supports mixed entries:
 
 - Legacy string entries such as `example.com` or `api.example.com:8443`
-- Object entries such as `{ endpoint: internal.example.local:8443, skipTLSVerify: true, followHTTPRedirects: false }`
+- Object entries such as `{ endpoint: internal.example.local:8443, skipTLSVerify: true, followHTTPRedirects: false, path: /healthz, method: GET, expectedStatusCodes: [200, 204] }`
 
 ### Configuration Fields
 
@@ -48,6 +53,10 @@ collectors:
 | `domains[].endpoint` | string | - | Domain endpoint in `host` or `host:port` format |
 | `domains[].skipTLSVerify` | bool | `false` | Skip TLS certificate verification for this domain during HTTPS and cert checks |
 | `domains[].followHTTPRedirects` | bool | `true` | Follow HTTP redirects for this domain during HTTP checks |
+| `domains[].path` | string | `/` | HTTP request path used during HTTP checks. Query strings are supported |
+| `domains[].method` | string | `GET` | HTTP request method used during HTTP checks |
+| `domains[].headers` | map[string]string | `{}` | HTTP request headers used during HTTP checks |
+| `domains[].expectedStatusCodes` | []int | `[]` | Exact HTTP status codes accepted as healthy. When empty, any `2xx`, `3xx`, or `4xx` response is healthy for backward compatibility |
 | `checkTimeout` | duration | `30s` | Timeout for each health check |
 | `checkInterval` | duration | `1m` | Interval between check cycles |
 | `dialRetries` | int | `3` | Number of connection attempts for HTTP and certificate checks. HTTPS attempts include both TCP dial and TLS handshake |
@@ -75,7 +84,7 @@ Notes:
 
 - `COLLECTORS_DOMAIN_DOMAINS` only supports the legacy comma-separated string format.
 - If `COLLECTORS_DOMAIN_DOMAINS` is set, it overrides the YAML `domains` list.
-- `skipTLSVerify` and `followHTTPRedirects` are only configurable through YAML object entries.
+- `skipTLSVerify`, `followHTTPRedirects`, `path`, `method`, `headers`, and `expectedStatusCodes` are only configurable through YAML object entries.
 
 ## Metrics
 
@@ -234,6 +243,8 @@ An IP is considered **unhealthy** if:
 - TLS certificate checks are performed independently for each resolved IP.
 - DNS results can be filtered globally with `includeIPv4` and `includeIPv6`.
 - HTTP checks and certificate checks both honor the per-domain `skipTLSVerify` option.
+- HTTP checks use per-domain `path`, `method`, `headers`, and `expectedStatusCodes` when configured.
+- When `expectedStatusCodes` is empty, HTTP checks keep the legacy behavior where any `2xx`, `3xx`, or `4xx` status is treated as healthy.
 - When `domains[].followHTTPRedirects=true`, redirects to the original monitored host continue to use the resolved IP being checked. Redirects to a different host fall back to the default dial path so the redirected hostname is resolved normally.
 - When `domains[].followHTTPRedirects=false`, the HTTP check returns the first redirect response instead of following it.
 - When `skipTLSVerify=true`, TLS chain and hostname verification are skipped for that domain. This is intended for internal endpoints with self-signed or privately issued certificates.

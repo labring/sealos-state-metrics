@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labring/sealos-state-metrics/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -97,11 +96,11 @@ func (dc *DomainChecker) CheckIPs(
 	// First, get the IPs for the domain
 	var ips []string
 	if dc.checkDNS || dc.checkHTTP {
-		dnsResult := util.CheckDNSWithFilter(
+		dnsResult := checkDNSWithFilter(
 			ctx,
 			domain.target.Host,
 			dc.timeout,
-			util.IPFamilyFilter{
+			ipFamilyFilter{
 				IncludeIPv4: dc.includeIPv4,
 				IncludeIPv6: dc.includeIPv6,
 			},
@@ -258,15 +257,21 @@ func (dc *DomainChecker) runIPChecks(
 ) {
 	if dc.checkHTTP {
 		health.HTTPChecked = true
-		result := util.CheckHTTPWithIPAndRetries(
+		result := checkHTTPWithIPAndOptions(
 			ctx,
 			domain.target.Host,
 			domain.target.Port,
 			ip,
 			domain.skipTLSVerify,
 			dc.timeout,
-			domain.followHTTPRedirects,
 			dc.dialRetries,
+			httpCheckOptions{
+				Method:              domain.httpMethod,
+				Path:                domain.httpPath,
+				Headers:             domain.httpHeaders,
+				ExpectedStatusCodes: domain.expectedStatusCodes,
+				FollowRedirects:     domain.followHTTPRedirects,
+			},
 		)
 		health.HTTPOk = result.Success
 		health.HTTPError = result.Error
@@ -299,7 +304,7 @@ func (dc *DomainChecker) runIPChecks(
 
 	health.CertChecked = true
 
-	certInfo, certErr := util.GetTLSCertWithIPAndRetries(
+	certInfo, certErr := getTLSCertWithIPAndRetries(
 		domain.target.Host,
 		domain.target.Port,
 		ip,

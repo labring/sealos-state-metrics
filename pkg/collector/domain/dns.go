@@ -1,4 +1,4 @@
-package util
+package domain
 
 import (
 	"context"
@@ -8,33 +8,23 @@ import (
 	"time"
 )
 
-type IPFamilyFilter struct {
+type ipFamilyFilter struct {
 	IncludeIPv4 bool
 	IncludeIPv6 bool
 }
 
-// DNSCheckResult contains the result of a DNS check
-type DNSCheckResult struct {
+type dnsCheckResult struct {
 	Success bool
 	IPs     []string
 	Error   string
 }
 
-// CheckDNS performs a DNS lookup
-func CheckDNS(ctx context.Context, domain string, timeout time.Duration) *DNSCheckResult {
-	return CheckDNSWithFilter(ctx, domain, timeout, IPFamilyFilter{
-		IncludeIPv4: true,
-		IncludeIPv6: true,
-	})
-}
-
-// CheckDNSWithFilter performs a DNS lookup and filters IPs by family.
-func CheckDNSWithFilter(
+func checkDNSWithFilter(
 	ctx context.Context,
 	domain string,
 	timeout time.Duration,
-	filter IPFamilyFilter,
-) *DNSCheckResult {
+	filter ipFamilyFilter,
+) *dnsCheckResult {
 	resolver := &net.Resolver{}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -42,7 +32,7 @@ func CheckDNSWithFilter(
 
 	ips, err := resolver.LookupHost(ctx, domain)
 	if err != nil {
-		return &DNSCheckResult{
+		return &dnsCheckResult{
 			Success: false,
 			Error:   fmt.Sprintf("DNS lookup failed: %v", err),
 		}
@@ -50,13 +40,13 @@ func CheckDNSWithFilter(
 
 	filteredIPs := filterIPsByFamily(ips, filter)
 
-	return &DNSCheckResult{
+	return &dnsCheckResult{
 		Success: len(filteredIPs) > 0,
 		IPs:     filteredIPs,
 	}
 }
 
-func filterIPsByFamily(ips []string, filter IPFamilyFilter) []string {
+func filterIPsByFamily(ips []string, filter ipFamilyFilter) []string {
 	if filter.IncludeIPv4 && filter.IncludeIPv6 {
 		return ips
 	}
@@ -82,12 +72,7 @@ func filterIPsByFamily(ips []string, filter IPFamilyFilter) []string {
 	return filtered
 }
 
-// CheckIPReachability checks if an IP is reachable
-func CheckIPReachability(ctx context.Context, ip string, port int, timeout time.Duration) bool {
-	return CheckIPReachabilityWithRetries(ctx, ip, port, timeout, 1)
-}
-
-func CheckIPReachabilityWithRetries(
+func checkIPReachabilityWithRetries(
 	ctx context.Context,
 	ip string,
 	port int,
@@ -98,7 +83,7 @@ func CheckIPReachabilityWithRetries(
 		Timeout: timeout,
 	}
 
-	dialContext := retryDialContext(dialer.DialContext, dialRetries)
+	dialContext := retryHTTPDialContext(dialer.DialContext, dialRetries)
 
 	conn, err := dialContext(ctx, "tcp", net.JoinHostPort(ip, strconv.Itoa(port)))
 	if err != nil {
