@@ -145,6 +145,18 @@ identity: ""
 # Collectors configuration
 collectors:
   domain:
+    # Supports legacy string entries and object entries with per-domain HTTP/TLS options.
+    # Example:
+    # domains:
+    #   - example.com
+    #   - endpoint: internal.example.local:8443
+    #     skipTLSVerify: true
+    #     followHTTPRedirects: false
+    #     path: /healthz?ready=true
+    #     method: GET
+    #     headers:
+    #       X-Probe: sealos-state-metrics
+    #     expectedStatusCodes: [200, 204]
     domains: []
     checkTimeout: "30s"
     checkInterval: "1m"

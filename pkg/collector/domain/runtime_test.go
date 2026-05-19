@@ -2,8 +2,13 @@
 package domain
 
 import (
+	"net/http"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/labring/sealos-state-metrics/pkg/config"
+	"github.com/mitchellh/mapstructure"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
@@ -340,6 +345,154 @@ func TestParseMonitoredDomainMap_WeaklyTypedInput(t *testing.T) {
 
 	if domain.followHTTPRedirects {
 		t.Fatal("domain.followHTTPRedirects = true, want false")
+	}
+}
+
+func TestParseMonitoredDomainMap_HTTPCheckOptions(t *testing.T) {
+	domain, err := parseMonitoredDomainMap(map[string]any{
+		"endpoint":            "internal.example.local:8443",
+		"path":                "healthz?ready=true",
+		"method":              "post",
+		"headers":             map[string]any{"X-Probe": "domain", "X-Trace": 1234},
+		"expectedStatusCodes": []any{http.StatusOK, "201", http.StatusOK},
+	})
+	if err != nil {
+		t.Fatalf("parseMonitoredDomainMap() returned error: %v", err)
+	}
+
+	if domain.httpPath != "healthz?ready=true" {
+		t.Fatalf("domain.httpPath = %q, want healthz?ready=true", domain.httpPath)
+	}
+
+	if domain.httpMethod != http.MethodPost {
+		t.Fatalf("domain.httpMethod = %q, want %q", domain.httpMethod, http.MethodPost)
+	}
+
+	wantHeaders := map[string]string{
+		"X-Probe": "domain",
+		"X-Trace": "1234",
+	}
+	if !reflect.DeepEqual(domain.httpHeaders, wantHeaders) {
+		t.Fatalf("domain.httpHeaders = %#v, want %#v", domain.httpHeaders, wantHeaders)
+	}
+
+	wantStatusCodes := []int{http.StatusOK, http.StatusCreated}
+	if !reflect.DeepEqual(domain.expectedStatusCodes, wantStatusCodes) {
+		t.Fatalf(
+			"domain.expectedStatusCodes = %#v, want %#v",
+			domain.expectedStatusCodes,
+			wantStatusCodes,
+		)
+	}
+}
+
+func TestNewRuntimeConfig_FromYAMLHTTPCheckOptions(t *testing.T) {
+	yamlContent := []byte(`
+collectors:
+  domain:
+    domains:
+      - endpoint: internal.example.local:8443
+        skipTLSVerify: true
+        followHTTPRedirects: false
+        path: /healthz?ready=true
+        method: post
+        headers:
+          X-Probe: sealos-state-metrics
+          X-Retry: 1
+        expectedStatusCodes:
+          - 200
+          - 204
+          - 200
+    checkTimeout: 5s
+    checkInterval: 2m
+    dialRetries: 4
+    includeIPv4: true
+    includeIPv6: false
+    includeCertCheck: false
+    includeHTTPCheck: true
+`)
+
+	cfg := NewDefaultConfig()
+
+	loader := config.NewModuleConfigLoader(
+		yamlContent,
+		config.WithModuleDecodeHook(mapstructure.StringToTimeDurationHookFunc()),
+	)
+	if err := loader.LoadModuleConfig("collectors.domain", cfg); err != nil {
+		t.Fatalf("LoadModuleConfig() returned error: %v", err)
+	}
+
+	runtimeCfg, err := newRuntimeConfig(cfg)
+	if err != nil {
+		t.Fatalf("newRuntimeConfig() returned error: %v", err)
+	}
+
+	if runtimeCfg.checkTimeout != 5*time.Second {
+		t.Fatalf("checkTimeout = %v, want 5s", runtimeCfg.checkTimeout)
+	}
+
+	if runtimeCfg.checkInterval != 2*time.Minute {
+		t.Fatalf("checkInterval = %v, want 2m", runtimeCfg.checkInterval)
+	}
+
+	if runtimeCfg.dialRetries != 4 {
+		t.Fatalf("dialRetries = %d, want 4", runtimeCfg.dialRetries)
+	}
+
+	if runtimeCfg.includeCertCheck {
+		t.Fatal("includeCertCheck = true, want false")
+	}
+
+	if !runtimeCfg.includeHTTPCheck {
+		t.Fatal("includeHTTPCheck = false, want true")
+	}
+
+	if len(runtimeCfg.domains) != 1 {
+		t.Fatalf("expected 1 domain, got %d", len(runtimeCfg.domains))
+	}
+
+	domain := runtimeCfg.domains[0]
+	if domain.endpoint != "internal.example.local:8443" ||
+		domain.target.Host != "internal.example.local" ||
+		domain.target.Port != 8443 ||
+		!domain.skipTLSVerify ||
+		domain.followHTTPRedirects {
+		t.Fatalf("unexpected runtime domain: %#v", domain)
+	}
+
+	if domain.httpPath != "/healthz?ready=true" {
+		t.Fatalf("domain.httpPath = %q, want /healthz?ready=true", domain.httpPath)
+	}
+
+	if domain.httpMethod != http.MethodPost {
+		t.Fatalf("domain.httpMethod = %q, want %q", domain.httpMethod, http.MethodPost)
+	}
+
+	wantHeaders := map[string]string{
+		"X-Probe": "sealos-state-metrics",
+		"X-Retry": "1",
+	}
+	if !reflect.DeepEqual(domain.httpHeaders, wantHeaders) {
+		t.Fatalf("domain.httpHeaders = %#v, want %#v", domain.httpHeaders, wantHeaders)
+	}
+
+	wantStatusCodes := []int{http.StatusOK, http.StatusNoContent}
+	if !reflect.DeepEqual(domain.expectedStatusCodes, wantStatusCodes) {
+		t.Fatalf(
+			"domain.expectedStatusCodes = %#v, want %#v",
+			domain.expectedStatusCodes,
+			wantStatusCodes,
+		)
+	}
+}
+
+func TestParseMonitoredDomainMap_InvalidExpectedStatusCode(t *testing.T) {
+	_, err := parseMonitoredDomainMap(map[string]any{
+		"endpoint":            "internal.example.local:8443",
+		"expectedStatusCodes": []any{99},
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid expected status code")
 	}
 }
 

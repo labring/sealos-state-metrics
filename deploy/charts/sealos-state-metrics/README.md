@@ -189,6 +189,11 @@ collectors:
       - example.com
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
+        path: /healthz?ready=true
+        method: GET
+        headers:
+          X-Probe: sealos-state-metrics
+        expectedStatusCodes: [200, 204]
       - test.com
     checkTimeout: 30s
     checkInterval: 1m

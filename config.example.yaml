@@ -120,6 +120,13 @@ collectors:
         skipTLSVerify: false
       - endpoint: internal.example.local:8443
         skipTLSVerify: true
+        path: /healthz?ready=true
+        method: GET
+        headers:
+          X-Probe: sealos-state-metrics
+        expectedStatusCodes:
+          - 200
+          - 204
     # Legacy format is still supported:
     # domains:
     #   - example.com

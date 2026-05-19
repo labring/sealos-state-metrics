@@ -1,5 +1,5 @@
-//nolint:testpackage // Tests need access to internal retryDialContext helper.
-package util
+//nolint:testpackage // Tests need access to internal HTTP check helpers.
+package domain
 
 import (
 	"context"
@@ -14,10 +14,11 @@ import (
 	"time"
 )
 
-func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t *testing.T) {
+func TestCheckHTTPWithIPAndOptions_FollowRedirectsFallsBackToDefaultDialForDifferentHost(
+	t *testing.T,
+) {
 	redirectTarget := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		}),
@@ -33,7 +34,6 @@ func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t
 
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 		}),
@@ -45,18 +45,23 @@ func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t
 		t.Fatalf("failed to parse origin URL: %v", err)
 	}
 
-	result := CheckHTTPWithIP(
+	result := checkHTTPWithIPAndOptions(
 		context.Background(),
 		originURL.Hostname(),
 		mustURLPort(t, originURL),
 		originURL.Hostname(),
 		true,
 		5*time.Second,
-		true,
+		1,
+		httpCheckOptions{
+			Method:          http.MethodGet,
+			Path:            "/",
+			FollowRedirects: true,
+		},
 	)
 
 	if !result.Success {
-		t.Fatalf("CheckHTTPWithIP() failed: %#v", result)
+		t.Fatalf("checkHTTPWithIPAndOptions() failed: %#v", result)
 	}
 
 	if result.StatusCode != http.StatusNoContent {
@@ -68,10 +73,9 @@ func TestCheckHTTPWithIP_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t
 	}
 }
 
-func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
+func TestCheckHTTPWithIPAndOptions_CanDisableRedirectFollowing(t *testing.T) {
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "https://localhost/next", http.StatusFound)
 		}),
@@ -83,18 +87,23 @@ func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
 		t.Fatalf("failed to parse origin URL: %v", err)
 	}
 
-	result := CheckHTTPWithIP(
+	result := checkHTTPWithIPAndOptions(
 		context.Background(),
 		originURL.Hostname(),
 		mustURLPort(t, originURL),
 		originURL.Hostname(),
 		true,
 		5*time.Second,
-		false,
+		1,
+		httpCheckOptions{
+			Method:          http.MethodGet,
+			Path:            "/",
+			FollowRedirects: false,
+		},
 	)
 
 	if !result.Success {
-		t.Fatalf("CheckHTTPWithIP() failed: %#v", result)
+		t.Fatalf("checkHTTPWithIPAndOptions() failed: %#v", result)
 	}
 
 	if result.StatusCode != http.StatusFound {
@@ -102,7 +111,7 @@ func TestCheckHTTPWithIP_CanDisableRedirectFollowing(t *testing.T) {
 	}
 }
 
-func TestCheckHTTPWithIPAndRetries_RetriesTLSHandshakeFailure(t *testing.T) {
+func TestCheckHTTPWithIPAndOptions_RetriesTLSHandshakeFailure(t *testing.T) {
 	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
@@ -124,19 +133,23 @@ func TestCheckHTTPWithIPAndRetries_RetriesTLSHandshakeFailure(t *testing.T) {
 		t.Fatalf("failed to parse origin URL: %v", err)
 	}
 
-	result := CheckHTTPWithIPAndRetries(
+	result := checkHTTPWithIPAndOptions(
 		context.Background(),
 		originURL.Hostname(),
 		mustURLPort(t, originURL),
 		originURL.Hostname(),
 		true,
 		5*time.Second,
-		true,
 		2,
+		httpCheckOptions{
+			Method:          http.MethodGet,
+			Path:            "/",
+			FollowRedirects: true,
+		},
 	)
 
 	if !result.Success {
-		t.Fatalf("CheckHTTPWithIPAndRetries() failed: %#v", result)
+		t.Fatalf("checkHTTPWithIPAndOptions() failed: %#v", result)
 	}
 
 	if result.StatusCode != http.StatusNoContent {
@@ -148,10 +161,157 @@ func TestCheckHTTPWithIPAndRetries_RetriesTLSHandshakeFailure(t *testing.T) {
 	}
 }
 
-func TestRetryDialContext_RetriesUntilSuccess(t *testing.T) {
+func TestCheckHTTPWithIPAndOptions_UsesRequestOptions(t *testing.T) {
+	origin := newLocalTLSServerOnAddr(
+		t,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				t.Errorf("request method = %q, want %q", r.Method, http.MethodPost)
+			}
+
+			if r.URL.RequestURI() != "/ready?probe=domain" {
+				t.Errorf("request URI = %q, want /ready?probe=domain", r.URL.RequestURI())
+			}
+
+			if r.Header.Get("X-Probe") != "domain" {
+				t.Errorf("X-Probe header = %q, want domain", r.Header.Get("X-Probe"))
+			}
+
+			w.WriteHeader(http.StatusCreated)
+		}),
+	)
+	defer origin.Close()
+
+	originURL, err := url.Parse(origin.URL)
+	if err != nil {
+		t.Fatalf("failed to parse origin URL: %v", err)
+	}
+
+	result := checkHTTPWithIPAndOptions(
+		context.Background(),
+		originURL.Hostname(),
+		mustURLPort(t, originURL),
+		originURL.Hostname(),
+		true,
+		5*time.Second,
+		1,
+		httpCheckOptions{
+			Method:              http.MethodPost,
+			Path:                "/ready?probe=domain",
+			Headers:             map[string]string{"X-Probe": "domain"},
+			ExpectedStatusCodes: []int{http.StatusCreated},
+			FollowRedirects:     true,
+		},
+	)
+
+	if !result.Success {
+		t.Fatalf("checkHTTPWithIPAndOptions() failed: %#v", result)
+	}
+
+	if result.StatusCode != http.StatusCreated {
+		t.Fatalf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusCreated)
+	}
+}
+
+func TestCheckHTTPWithIPAndOptions_RejectsUnexpectedStatusCode(t *testing.T) {
+	origin := newLocalTLSServerOnAddr(
+		t,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	)
+	defer origin.Close()
+
+	originURL, err := url.Parse(origin.URL)
+	if err != nil {
+		t.Fatalf("failed to parse origin URL: %v", err)
+	}
+
+	result := checkHTTPWithIPAndOptions(
+		context.Background(),
+		originURL.Hostname(),
+		mustURLPort(t, originURL),
+		originURL.Hostname(),
+		true,
+		5*time.Second,
+		1,
+		httpCheckOptions{
+			ExpectedStatusCodes: []int{http.StatusOK},
+			FollowRedirects:     true,
+		},
+	)
+
+	if result.Success {
+		t.Fatalf("checkHTTPWithIPAndOptions() succeeded, want failure: %#v", result)
+	}
+
+	if result.StatusCode != http.StatusNoContent {
+		t.Fatalf("result.StatusCode = %d, want %d", result.StatusCode, http.StatusNoContent)
+	}
+}
+
+func TestCheckHTTPWithIPAndOptions_DoesNotWaitForResponseBody(t *testing.T) {
+	bodyStarted := make(chan struct{})
+	releaseBody := make(chan struct{})
+
+	origin := newLocalTLSServerOnAddr(
+		t,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+
+			close(bodyStarted)
+			<-releaseBody
+		}),
+	)
+	defer origin.Close()
+	defer close(releaseBody)
+
+	originURL, err := url.Parse(origin.URL)
+	if err != nil {
+		t.Fatalf("failed to parse origin URL: %v", err)
+	}
+
+	start := time.Now()
+	result := checkHTTPWithIPAndOptions(
+		context.Background(),
+		originURL.Hostname(),
+		mustURLPort(t, originURL),
+		originURL.Hostname(),
+		true,
+		5*time.Second,
+		1,
+		httpCheckOptions{
+			Method:              http.MethodGet,
+			Path:                "/",
+			ExpectedStatusCodes: []int{http.StatusOK},
+			FollowRedirects:     true,
+		},
+	)
+	elapsed := time.Since(start)
+
+	if !result.Success {
+		t.Fatalf("checkHTTPWithIPAndOptions() failed: %#v", result)
+	}
+
+	select {
+	case <-bodyStarted:
+	default:
+		t.Fatal("expected handler to start streaming body")
+	}
+
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("check waited for response body: elapsed = %v", elapsed)
+	}
+}
+
+func TestRetryHTTPDialContext_RetriesUntilSuccess(t *testing.T) {
 	attempts := 0
 	wantConn := &mockConn{}
-	dialContext := retryDialContext(
+	dialContext := retryHTTPDialContext(
 		func(context.Context, string, string) (net.Conn, error) {
 			attempts++
 			if attempts < 3 {
@@ -177,11 +337,11 @@ func TestRetryDialContext_RetriesUntilSuccess(t *testing.T) {
 	}
 }
 
-func TestRetryDialContext_StopsOnContextCancellation(t *testing.T) {
+func TestRetryHTTPDialContext_StopsOnContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	attempts := 0
 
-	dialContext := retryDialContext(
+	dialContext := retryHTTPDialContext(
 		func(context.Context, string, string) (net.Conn, error) {
 			attempts++
 
@@ -200,9 +360,9 @@ func TestRetryDialContext_StopsOnContextCancellation(t *testing.T) {
 	}
 }
 
-func TestRetryDialContext_NormalizesInvalidRetries(t *testing.T) {
+func TestRetryHTTPDialContext_NormalizesInvalidRetries(t *testing.T) {
 	attempts := 0
-	dialContext := retryDialContext(
+	dialContext := retryHTTPDialContext(
 		func(context.Context, string, string) (net.Conn, error) {
 			attempts++
 			return nil, errors.New("dial failed")
@@ -219,12 +379,12 @@ func TestRetryDialContext_NormalizesInvalidRetries(t *testing.T) {
 	}
 }
 
-func newLocalTLSServerOnAddr(t *testing.T, addr string, handler http.Handler) *httptest.Server {
+func newLocalTLSServerOnAddr(t *testing.T, handler http.Handler) *httptest.Server {
 	t.Helper()
 
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("failed to listen on %q: %v", addr, err)
+		t.Fatalf("failed to listen on loopback: %v", err)
 	}
 
 	server := httptest.NewUnstartedServer(handler)

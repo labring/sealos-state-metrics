@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -24,12 +25,20 @@ type monitoredDomain struct {
 	target              DomainTarget
 	skipTLSVerify       bool
 	followHTTPRedirects bool
+	httpMethod          string
+	httpPath            string
+	httpHeaders         map[string]string
+	expectedStatusCodes []int
 }
 
 type monitoredDomainConfig struct {
-	Endpoint            string `mapstructure:"endpoint"`
-	SkipTLSVerify       bool   `mapstructure:"skipTLSVerify"`
-	FollowHTTPRedirects *bool  `mapstructure:"followHTTPRedirects"`
+	Endpoint            string            `mapstructure:"endpoint"`
+	SkipTLSVerify       bool              `mapstructure:"skipTLSVerify"`
+	FollowHTTPRedirects *bool             `mapstructure:"followHTTPRedirects"`
+	HTTPPath            string            `mapstructure:"path"`
+	HTTPMethod          string            `mapstructure:"method"`
+	HTTPHeaders         map[string]string `mapstructure:"headers"`
+	ExpectedStatusCodes []int             `mapstructure:"expectedStatusCodes"`
 }
 
 type runtimeConfig struct {
@@ -122,6 +131,8 @@ func parseMonitoredDomainString(value string) (monitoredDomain, error) {
 		endpoint:            endpoint,
 		target:              target,
 		followHTTPRedirects: true,
+		httpMethod:          http.MethodGet,
+		httpPath:            "/",
 	}, nil
 }
 
@@ -159,7 +170,51 @@ func parseMonitoredDomainMap(value map[string]any) (monitoredDomain, error) {
 		domain.followHTTPRedirects = *cfg.FollowHTTPRedirects
 	}
 
+	if strings.TrimSpace(cfg.HTTPMethod) != "" {
+		domain.httpMethod = strings.ToUpper(strings.TrimSpace(cfg.HTTPMethod))
+	}
+
+	if strings.TrimSpace(cfg.HTTPPath) != "" {
+		domain.httpPath = strings.TrimSpace(cfg.HTTPPath)
+	}
+
+	if len(cfg.HTTPHeaders) > 0 {
+		domain.httpHeaders = cfg.HTTPHeaders
+	}
+
+	if len(cfg.ExpectedStatusCodes) > 0 {
+		expectedStatusCodes, err := normalizeExpectedStatusCodes(cfg.ExpectedStatusCodes)
+		if err != nil {
+			return monitoredDomain{}, err
+		}
+
+		domain.expectedStatusCodes = expectedStatusCodes
+	}
+
 	return domain, nil
+}
+
+func normalizeExpectedStatusCodes(statusCodes []int) ([]int, error) {
+	seen := make(map[int]struct{}, len(statusCodes))
+	normalized := make([]int, 0, len(statusCodes))
+
+	for _, statusCode := range statusCodes {
+		if statusCode < 100 || statusCode > 599 {
+			return nil, fmt.Errorf(
+				"invalid expected HTTP status code %d: must be between 100 and 599",
+				statusCode,
+			)
+		}
+
+		if _, ok := seen[statusCode]; ok {
+			continue
+		}
+
+		seen[statusCode] = struct{}{}
+		normalized = append(normalized, statusCode)
+	}
+
+	return normalized, nil
 }
 
 func parseDomainTarget(value string) (DomainTarget, error) {
