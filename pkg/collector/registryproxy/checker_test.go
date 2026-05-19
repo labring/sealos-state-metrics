@@ -158,10 +158,10 @@ func mustLocalRegistry(t *testing.T, server *httptest.Server) monitoredRegistry 
 	}
 
 	return monitoredRegistry{
-		endpoint:             net.JoinHostPort(host, portValue),
+		endpoint:             "http://" + net.JoinHostPort(host, portValue),
 		target:               registryTarget{Scheme: "http", Host: host, Port: port},
-		repository:           defaultManifestRepo,
-		reference:            defaultManifestReference,
+		repository:           "library/busybox",
+		reference:            "latest",
 		manifestAcceptHeader: defaultManifestMediaType,
 		headers:              map[string]string{},
 	}

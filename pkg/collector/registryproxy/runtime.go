@@ -8,16 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 const (
-	defaultRegistryScheme    = "http"
-	defaultRegistryPort      = 5000
 	defaultManifestMediaType = "application/vnd.docker.distribution.manifest.v2+json"
-	defaultManifestRepo      = "library/busybox"
-	defaultManifestReference = "latest"
 )
 
 type registryTarget struct {
@@ -36,16 +30,6 @@ type monitoredRegistry struct {
 	headers              map[string]string
 }
 
-type monitoredRegistryConfig struct {
-	Endpoint             string            `mapstructure:"endpoint"`
-	Info                 string            `mapstructure:"info"`
-	Scheme               string            `mapstructure:"scheme"`
-	Repository           string            `mapstructure:"repository"`
-	Reference            string            `mapstructure:"reference"`
-	ManifestAcceptHeader string            `mapstructure:"manifestAcceptHeader"`
-	Headers              map[string]string `mapstructure:"headers"`
-}
-
 type runtimeConfig struct {
 	registries    []monitoredRegistry
 	checkTimeout  time.Duration
@@ -53,15 +37,7 @@ type runtimeConfig struct {
 }
 
 func newRuntimeConfig(cfg *Config) (*runtimeConfig, error) {
-	registryItems := cfg.Registries
-	if len(cfg.RegistriesEnv) > 0 {
-		registryItems = make([]any, 0, len(cfg.RegistriesEnv))
-		for _, value := range cfg.RegistriesEnv {
-			registryItems = append(registryItems, value)
-		}
-	}
-
-	registries, err := parseMonitoredRegistries(registryItems)
+	registries, err := parseMonitoredRegistries(cfg.Registries)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +49,7 @@ func newRuntimeConfig(cfg *Config) (*runtimeConfig, error) {
 	}, nil
 }
 
-func parseMonitoredRegistries(values []any) ([]monitoredRegistry, error) {
+func parseMonitoredRegistries(values []RegistryConfig) ([]monitoredRegistry, error) {
 	registries := make([]monitoredRegistry, 0, len(values))
 
 	for _, value := range values {
@@ -92,74 +68,30 @@ func parseMonitoredRegistries(values []any) ([]monitoredRegistry, error) {
 	return registries, nil
 }
 
-func parseMonitoredRegistry(value any) (monitoredRegistry, error) {
-	switch v := value.(type) {
-	case string:
-		return parseMonitoredRegistryString(v)
-	case map[string]any:
-		return parseMonitoredRegistryMap(v)
-	default:
-		return monitoredRegistry{}, fmt.Errorf("invalid registry proxy entry type %T", value)
-	}
-}
-
-func parseMonitoredRegistryString(value string) (monitoredRegistry, error) {
-	endpoint := strings.TrimSpace(value)
-	if endpoint == "" {
-		return monitoredRegistry{}, nil
-	}
-
-	target, err := parseRegistryTarget(endpoint, "")
-	if err != nil {
-		return monitoredRegistry{}, err
-	}
-
-	return monitoredRegistry{
-		endpoint:             endpoint,
-		target:               target,
-		repository:           defaultManifestRepo,
-		reference:            defaultManifestReference,
-		manifestAcceptHeader: defaultManifestMediaType,
-		headers:              map[string]string{},
-	}, nil
-}
-
-func parseMonitoredRegistryMap(value map[string]any) (monitoredRegistry, error) {
-	var cfg monitoredRegistryConfig
-
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		TagName:          "mapstructure",
-		Result:           &cfg,
-		WeaklyTypedInput: true,
-	})
-	if err != nil {
-		return monitoredRegistry{}, fmt.Errorf(
-			"failed to create registry proxy entry decoder: %w",
-			err,
-		)
-	}
-
-	if err := decoder.Decode(value); err != nil {
-		return monitoredRegistry{}, fmt.Errorf("invalid registry proxy entry %v: %w", value, err)
-	}
-
+func parseMonitoredRegistry(cfg RegistryConfig) (monitoredRegistry, error) {
 	if strings.TrimSpace(cfg.Endpoint) == "" {
 		return monitoredRegistry{}, errors.New("invalid registry proxy entry: endpoint is required")
 	}
 
-	target, err := parseRegistryTarget(cfg.Endpoint, cfg.Scheme)
+	target, err := parseRegistryTarget(cfg.Endpoint)
 	if err != nil {
 		return monitoredRegistry{}, err
 	}
 
 	repository := normalizeRepository(cfg.Repository)
 	if repository == "" {
-		repository = defaultManifestRepo
+		return monitoredRegistry{}, fmt.Errorf(
+			"invalid registry proxy entry %q: repository is required",
+			cfg.Endpoint,
+		)
 	}
 
 	reference := strings.TrimSpace(cfg.Reference)
 	if reference == "" {
-		reference = defaultManifestReference
+		return monitoredRegistry{}, fmt.Errorf(
+			"invalid registry proxy entry %q: reference is required",
+			cfg.Endpoint,
+		)
 	}
 
 	manifestAcceptHeader := strings.TrimSpace(cfg.ManifestAcceptHeader)
@@ -188,52 +120,46 @@ func parseMonitoredRegistryMap(value map[string]any) (monitoredRegistry, error) 
 	}, nil
 }
 
-func parseRegistryTarget(endpoint, schemeOverride string) (registryTarget, error) {
+func parseRegistryTarget(endpoint string) (registryTarget, error) {
 	raw := strings.TrimSpace(endpoint)
 	if raw == "" {
 		return registryTarget{}, nil
 	}
 
-	scheme := normalizeRegistryScheme(schemeOverride)
+	if !strings.Contains(raw, "://") {
+		return registryTarget{}, fmt.Errorf(
+			"invalid registry proxy endpoint %q: endpoint must include http or https scheme",
+			endpoint,
+		)
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return registryTarget{}, fmt.Errorf("invalid registry proxy endpoint %q: %w", endpoint, err)
+	}
+
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return registryTarget{}, fmt.Errorf(
+			"invalid registry proxy endpoint %q: scheme and host are required",
+			endpoint,
+		)
+	}
+
+	scheme := normalizeRegistryScheme(parsed.Scheme)
 	if err := validateRegistryScheme(scheme); err != nil {
 		return registryTarget{}, err
 	}
 
-	if strings.Contains(raw, "://") {
-		parsed, err := url.Parse(raw)
-		if err != nil {
-			return registryTarget{}, fmt.Errorf(
-				"invalid registry proxy endpoint %q: %w",
-				endpoint,
-				err,
-			)
-		}
-
-		if parsed.Scheme == "" || parsed.Host == "" {
-			return registryTarget{}, fmt.Errorf(
-				"invalid registry proxy endpoint %q: scheme and host are required",
-				endpoint,
-			)
-		}
-
-		if parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "" ||
-			parsed.Fragment != "" ||
-			parsed.User != nil {
-			return registryTarget{}, fmt.Errorf(
-				"invalid registry proxy endpoint %q: only scheme, host, and port are supported",
-				endpoint,
-			)
-		}
-
-		scheme = normalizeRegistryScheme(parsed.Scheme)
-		if err := validateRegistryScheme(scheme); err != nil {
-			return registryTarget{}, err
-		}
-
-		raw = parsed.Host
+	if parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "" ||
+		parsed.Fragment != "" ||
+		parsed.User != nil {
+		return registryTarget{}, fmt.Errorf(
+			"invalid registry proxy endpoint %q: only scheme, host, and port are supported",
+			endpoint,
+		)
 	}
 
-	host, port, err := splitRegistryHostPort(raw, endpoint, scheme)
+	host, port, err := splitRegistryHostPort(parsed.Host, endpoint)
 	if err != nil {
 		return registryTarget{}, err
 	}
@@ -241,7 +167,7 @@ func parseRegistryTarget(endpoint, schemeOverride string) (registryTarget, error
 	return newRegistryTarget(scheme, host, port, endpoint)
 }
 
-func splitRegistryHostPort(raw, original, scheme string) (string, int, error) {
+func splitRegistryHostPort(raw, original string) (string, int, error) {
 	host, port, err := net.SplitHostPort(raw)
 	if err == nil {
 		portNum, err := parsePort(port, original)
@@ -256,12 +182,11 @@ func splitRegistryHostPort(raw, original, scheme string) (string, int, error) {
 	if errors.As(err, &addrErr) {
 		switch addrErr.Err {
 		case "missing port in address":
-			return strings.Trim(raw, "[]"), defaultPortForScheme(scheme), nil
+			return "", 0, fmt.Errorf(
+				"invalid registry proxy endpoint %q: port is required",
+				original,
+			)
 		case "too many colons in address":
-			if net.ParseIP(raw) != nil {
-				return raw, defaultPortForScheme(scheme), nil
-			}
-
 			return "", 0, fmt.Errorf(
 				"invalid registry proxy endpoint %q: IPv6 addresses with ports must use [host]:port",
 				original,
@@ -299,12 +224,7 @@ func newRegistryTarget(scheme, host string, port int, original string) (registry
 }
 
 func normalizeRegistryScheme(scheme string) string {
-	scheme = strings.ToLower(strings.TrimSpace(scheme))
-	if scheme == "" {
-		return defaultRegistryScheme
-	}
-
-	return scheme
+	return strings.ToLower(strings.TrimSpace(scheme))
 }
 
 func validateRegistryScheme(scheme string) error {
@@ -316,15 +236,6 @@ func validateRegistryScheme(scheme string) error {
 			"unsupported registry proxy scheme %q: only http and https are supported",
 			scheme,
 		)
-	}
-}
-
-func defaultPortForScheme(scheme string) int {
-	switch normalizeRegistryScheme(scheme) {
-	case "https":
-		return 443
-	default:
-		return defaultRegistryPort
 	}
 }
 

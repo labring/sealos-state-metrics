@@ -22,26 +22,17 @@ func TestParseRegistryTarget(t *testing.T) {
 	tests := []struct {
 		name       string
 		endpoint   string
-		scheme     string
 		wantScheme string
 		wantHost   string
 		wantPort   int
 		wantError  bool
 	}{
 		{
-			name:       "host with port",
-			endpoint:   "registry.example.com:5000",
+			name:       "http URL endpoint",
+			endpoint:   "http://registry.example.com:5000",
 			wantScheme: "http",
 			wantHost:   "registry.example.com",
 			wantPort:   5000,
-		},
-		{
-			name:       "scheme override",
-			endpoint:   "registry.example.com:5443",
-			scheme:     "https",
-			wantScheme: "https",
-			wantHost:   "registry.example.com",
-			wantPort:   5443,
 		},
 		{
 			name:       "url endpoint",
@@ -51,18 +42,28 @@ func TestParseRegistryTarget(t *testing.T) {
 			wantPort:   5443,
 		},
 		{
-			name:       "ipv4 literal without port",
-			endpoint:   "67.21.84.122",
+			name:       "ipv4 literal with port",
+			endpoint:   "http://67.21.84.122:5000",
 			wantScheme: "http",
 			wantHost:   "67.21.84.122",
 			wantPort:   5000,
 		},
 		{
 			name:       "ipv6 with port",
-			endpoint:   "[::1]:5000",
+			endpoint:   "http://[::1]:5000",
 			wantScheme: "http",
 			wantHost:   "::1",
 			wantPort:   5000,
+		},
+		{
+			name:      "missing scheme",
+			endpoint:  "registry.example.com:5000",
+			wantError: true,
+		},
+		{
+			name:      "missing port",
+			endpoint:  "http://registry.example.com",
+			wantError: true,
 		},
 		{
 			name:      "path not allowed",
@@ -71,17 +72,17 @@ func TestParseRegistryTarget(t *testing.T) {
 		},
 		{
 			name:      "invalid port",
-			endpoint:  "registry.example.com:bad",
+			endpoint:  "http://registry.example.com:bad",
 			wantError: true,
 		},
 		{
 			name:      "missing host",
-			endpoint:  ":5000",
+			endpoint:  "http://:5000",
 			wantError: true,
 		},
 		{
 			name:      "multi-colon hostname",
-			endpoint:  "host:name:5000",
+			endpoint:  "http://host:name:5000",
 			wantError: true,
 		},
 		{
@@ -93,7 +94,7 @@ func TestParseRegistryTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			target, err := parseRegistryTarget(tt.endpoint, tt.scheme)
+			target, err := parseRegistryTarget(tt.endpoint)
 			if tt.wantError {
 				if err == nil {
 					t.Fatalf("expected error for %q", tt.endpoint)
@@ -122,21 +123,22 @@ func TestParseRegistryTarget(t *testing.T) {
 
 func TestNewRuntimeConfig(t *testing.T) {
 	cfg := &Config{
-		Registries: []any{
-			map[string]any{
-				"endpoint":             "registry.example.com:5000",
-				"info":                 "internal proxy",
-				"scheme":               "http",
-				"repository":           "/library/alpine/",
-				"reference":            "3.20",
-				"manifestAcceptHeader": "application/vnd.oci.image.manifest.v1+json",
-				"headers": map[string]any{
+		Registries: []RegistryConfig{
+			{
+				Endpoint:             "http://registry.example.com:5000",
+				Info:                 "internal proxy",
+				Repository:           "/library/alpine/",
+				Reference:            "3.20",
+				ManifestAcceptHeader: "application/vnd.oci.image.manifest.v1+json",
+				Headers: map[string]string{
 					"X-Probe": "sealos-state-metrics",
 				},
 			},
-			"67.21.84.122:5000",
-			"",
-			"   ",
+			{
+				Endpoint:   "http://127.0.0.1:5000",
+				Repository: "library/busybox",
+				Reference:  "latest",
+			},
 		},
 		CheckTimeout:  7 * time.Second,
 		CheckInterval: 11 * time.Minute,
@@ -152,7 +154,7 @@ func TestNewRuntimeConfig(t *testing.T) {
 	}
 
 	first := runtimeCfg.registries[0]
-	if first.endpoint != "registry.example.com:5000" ||
+	if first.endpoint != "http://registry.example.com:5000" ||
 		first.info != "internal proxy" ||
 		first.target.Scheme != "http" ||
 		first.target.Host != "registry.example.com" ||
@@ -165,8 +167,8 @@ func TestNewRuntimeConfig(t *testing.T) {
 	}
 
 	second := runtimeCfg.registries[1]
-	if second.repository != defaultManifestRepo ||
-		second.reference != defaultManifestReference ||
+	if second.repository != "library/busybox" ||
+		second.reference != "latest" ||
 		second.manifestAcceptHeader != defaultManifestMediaType {
 		t.Fatalf("unexpected second registry defaults: %#v", second)
 	}
@@ -180,35 +182,11 @@ func TestNewRuntimeConfig(t *testing.T) {
 	}
 }
 
-func TestNewRuntimeConfigRegistriesEnvOverride(t *testing.T) {
-	cfg := &Config{
-		Registries: []any{
-			"from-file.example.com:5000",
-		},
-		RegistriesEnv: []string{
-			"from-env.example.com:5000",
-		},
-	}
-
-	runtimeCfg, err := newRuntimeConfig(cfg)
-	if err != nil {
-		t.Fatalf("newRuntimeConfig() returned error: %v", err)
-	}
-
-	if len(runtimeCfg.registries) != 1 {
-		t.Fatalf("expected 1 registry, got %d", len(runtimeCfg.registries))
-	}
-
-	if runtimeCfg.registries[0].endpoint != "from-env.example.com:5000" {
-		t.Fatalf("endpoint = %q, want env override", runtimeCfg.registries[0].endpoint)
-	}
-}
-
 func TestRegistryURLs(t *testing.T) {
-	registry, err := parseMonitoredRegistry(map[string]any{
-		"endpoint":   "registry.example.com:5000",
-		"repository": "/library/busybox/",
-		"reference":  "sha256:abc123",
+	registry, err := parseMonitoredRegistry(RegistryConfig{
+		Endpoint:   "http://registry.example.com:5000",
+		Repository: "/library/busybox/",
+		Reference:  "sha256:abc123",
 	})
 	if err != nil {
 		t.Fatalf("parseMonitoredRegistry returned error: %v", err)
@@ -221,5 +199,35 @@ func TestRegistryURLs(t *testing.T) {
 	wantManifest := "http://registry.example.com:5000/v2/library/busybox/manifests/sha256:abc123"
 	if got := registryManifestURL(registry); got != wantManifest {
 		t.Fatalf("registryManifestURL() = %q, want %q", got, wantManifest)
+	}
+}
+
+func TestParseMonitoredRegistryRequiresRepositoryAndReference(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  RegistryConfig
+	}{
+		{
+			name: "missing repository",
+			cfg: RegistryConfig{
+				Endpoint:  "http://registry.example.com:5000",
+				Reference: "latest",
+			},
+		},
+		{
+			name: "missing reference",
+			cfg: RegistryConfig{
+				Endpoint:   "http://registry.example.com:5000",
+				Repository: "library/busybox",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := parseMonitoredRegistry(tt.cfg); err == nil {
+				t.Fatalf("expected error for %#v", tt.cfg)
+			}
+		})
 	}
 }
