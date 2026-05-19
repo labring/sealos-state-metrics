@@ -174,7 +174,10 @@ func (r *Registry) createCollectors(cfg *InitConfig, action string) {
 			PodName:              cfg.PodName,
 			MetricsNamespace:     cfg.MetricsNamespace,
 			InformerResyncPeriod: cfg.InformerResyncPeriod,
-			Logger:               logger.WithField("collector", name),
+			Logger: log.WithFields(log.Fields{
+				"collector": name,
+				"module":    "collector",
+			}),
 		}
 
 		c, err := factory(factoryCtx)
