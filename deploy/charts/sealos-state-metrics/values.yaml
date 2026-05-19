@@ -127,7 +127,7 @@ leaderElection:
   retryPeriod: "2s"
 
 # Enabled collectors
-# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm, database, crd]
+# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm, database, cockroachlicense, crd]
 enabledCollectors:
   - domain
   - node
@@ -192,6 +192,15 @@ collectors:
     postgresqlConcurrency: 50   # Default: 50 concurrent PostgreSQL connections
     mongodbConcurrency: 50      # Default: 50 concurrent MongoDB connections
     redisConcurrency: 100       # Default: 100 concurrent Redis connections (Redis is typically faster)
+
+  cockroachlicense:
+    checkTimeout: "10s"
+    checkInterval: "5m"
+    clusters: []
+    # Example:
+    # clusters:
+    #   - name: production
+    #     dsn: "postgresql://root@cockroach-public.default.svc:26257/defaultdb?sslmode=verify-full&sslrootcert=/certs/ca.crt&sslcert=/certs/client.root.crt&sslkey=/certs/client.root.key"
 
   crds:
     crds:
