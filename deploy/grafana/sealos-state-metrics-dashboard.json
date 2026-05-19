@@ -19,9 +19,8 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
+  "id": 80,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -73,6 +72,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -80,9 +80,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -137,6 +139,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -144,9 +147,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -197,6 +202,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -204,9 +210,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -261,6 +269,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -268,9 +277,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -325,6 +336,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -332,9 +344,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -385,6 +399,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -392,9 +407,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -451,6 +468,8 @@
       },
       "id": 107,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -460,9 +479,10 @@
           "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -519,6 +539,8 @@
       },
       "id": 108,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -528,9 +550,10 @@
           "values": false
         },
         "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
-      "pluginVersion": "10.0.0",
+      "pluginVersion": "11.3.9",
       "targets": [
         {
           "datasource": {
@@ -670,8 +693,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -773,8 +795,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "yellow",
@@ -865,8 +886,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -894,8 +914,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "green",
-                          "value": null
+                          "color": "green"
                         },
                         {
                           "color": "yellow",
@@ -930,7 +949,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 14
+            "y": 44
           },
           "id": 204,
           "options": {
@@ -990,11 +1009,11 @@
                   "job": true
                 },
                 "indexByName": {
-                  "namespace": 0,
-                  "database": 1,
-                  "type": 2,
                   "Value #A": 3,
-                  "Value #B": 4
+                  "Value #B": 4,
+                  "database": 1,
+                  "namespace": 0,
+                  "type": 2
                 },
                 "renameByName": {
                   "Value #A": "状态",
@@ -1054,8 +1073,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -1067,7 +1085,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 24
+            "y": 54
           },
           "id": 205,
           "options": {
@@ -1153,8 +1171,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -1274,9 +1291,9 @@
                   "job": true
                 },
                 "indexByName": {
-                  "node": 0,
                   "Value #A": 1,
-                  "Value #B": 2
+                  "Value #B": 2,
+                  "node": 0
                 },
                 "renameByName": {
                   "Value #A": "健康状态",
@@ -1311,8 +1328,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -1387,8 +1403,8 @@
                   "status": true
                 },
                 "indexByName": {
-                  "node": 0,
-                  "condition": 1
+                  "condition": 1,
+                  "node": 0
                 },
                 "renameByName": {
                   "condition": "条件",
@@ -1461,8 +1477,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -1473,7 +1488,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 47
           },
           "id": 303,
           "options": {
@@ -1540,8 +1555,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "green",
@@ -1722,11 +1736,11 @@
                   "type": true
                 },
                 "indexByName": {
-                  "domain": 0,
                   "Value #A": 1,
                   "Value #B": 2,
                   "Value #C": 3,
-                  "Value #D": 4
+                  "Value #D": 4,
+                  "domain": 0
                 },
                 "renameByName": {
                   "Value #A": "解析状态",
@@ -1779,8 +1793,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -1836,8 +1849,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "green",
-                          "value": null
+                          "color": "green"
                         },
                         {
                           "color": "yellow",
@@ -1878,8 +1890,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "yellow",
@@ -1904,7 +1915,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 16
+            "y": 46
           },
           "id": 402,
           "options": {
@@ -1981,12 +1992,12 @@
                   "job": true
                 },
                 "indexByName": {
-                  "domain": 0,
-                  "ip": 1,
                   "Value #A": 2,
                   "Value #B": 3,
                   "Value #C": 4,
-                  "Value #D": 5
+                  "Value #D": 5,
+                  "domain": 0,
+                  "ip": 1
                 },
                 "renameByName": {
                   "Value #A": "HTTP",
@@ -2047,8 +2058,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2060,7 +2070,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 56
           },
           "id": 403,
           "options": {
@@ -2130,8 +2140,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2160,8 +2169,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "green",
-                          "value": null
+                          "color": "green"
                         },
                         {
                           "color": "yellow",
@@ -2256,11 +2264,11 @@
                   "job": true
                 },
                 "indexByName": {
-                  "node": 0,
                   "Value #A": 1,
-                  "Value #C": 2,
                   "Value #B": 3,
-                  "Value #D": 4
+                  "Value #C": 2,
+                  "Value #D": 4,
+                  "node": 0
                 },
                 "renameByName": {
                   "Value #A": "总容量",
@@ -2322,8 +2330,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "yellow",
@@ -2343,7 +2350,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 47
           },
           "id": 502,
           "options": {
@@ -2414,8 +2421,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -2489,12 +2495,12 @@
                   "job": true
                 },
                 "indexByName": {
-                  "namespace": 0,
-                  "pod": 1,
-                  "node": 2,
                   "image": 3,
-                  "registry": 4,
-                  "reason": 5
+                  "namespace": 0,
+                  "node": 2,
+                  "pod": 1,
+                  "reason": 5,
+                  "registry": 4
                 },
                 "renameByName": {
                   "image": "镜像",
@@ -2532,8 +2538,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -2544,7 +2549,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 20
+            "y": 50
           },
           "id": 602,
           "options": {
@@ -2584,20 +2589,20 @@
                   "job": true
                 },
                 "indexByName": {
-                  "namespace": 0,
-                  "pod": 1,
-                  "node": 2,
+                  "Value": 5,
                   "image": 3,
-                  "registry": 4,
-                  "Value": 5
+                  "namespace": 0,
+                  "node": 2,
+                  "pod": 1,
+                  "registry": 4
                 },
                 "renameByName": {
+                  "Value": "持续时间(秒)",
                   "image": "镜像",
                   "namespace": "命名空间",
                   "node": "节点",
                   "pod": "Pod",
-                  "registry": "镜像仓库",
-                  "Value": "持续时间(秒)"
+                  "registry": "镜像仓库"
                 }
               }
             }
@@ -2650,8 +2655,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2663,7 +2667,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 30
+            "y": 60
           },
           "id": 603,
           "options": {
@@ -2732,8 +2736,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2758,8 +2761,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "yellow",
@@ -2826,11 +2828,11 @@
                   "job": true
                 },
                 "indexByName": {
-                  "region": 0,
-                  "owner": 1,
-                  "type": 2,
+                  "Value": 4,
                   "level": 3,
-                  "Value": 4
+                  "owner": 1,
+                  "region": 0,
+                  "type": 2
                 },
                 "renameByName": {
                   "Value": "余额",
@@ -2881,8 +2883,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2907,8 +2908,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "yellow",
@@ -2969,9 +2969,9 @@
                   "job": true
                 },
                 "indexByName": {
-                  "provider": 0,
+                  "Value": 2,
                   "account_id": 1,
-                  "Value": 2
+                  "provider": 0
                 },
                 "renameByName": {
                   "Value": "余额",
@@ -3029,8 +3029,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3105,8 +3104,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -3165,8 +3163,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "green",
@@ -3231,8 +3228,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "yellow",
@@ -3297,8 +3293,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "yellow",
@@ -3361,8 +3356,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3425,8 +3419,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "yellow",
@@ -3516,8 +3509,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -3543,7 +3535,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 47
           },
           "id": 907,
           "options": {
@@ -3589,22 +3581,22 @@
                   "job": true
                 },
                 "indexByName": {
+                  "Value": 6,
                   "cluster": 0,
-                  "type": 1,
                   "environment": 2,
                   "license_id": 3,
                   "organization_id": 4,
                   "organization_name": 5,
-                  "Value": 6
+                  "type": 1
                 },
                 "renameByName": {
+                  "Value": "License 状态",
                   "cluster": "集群",
-                  "type": "License 类型",
                   "environment": "环境",
                   "license_id": "License ID",
                   "organization_id": "组织 ID",
                   "organization_name": "组织名称",
-                  "Value": "License 状态"
+                  "type": "License 类型"
                 }
               }
             }
@@ -3634,8 +3626,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               }
@@ -3675,8 +3666,7 @@
                       "mode": "absolute",
                       "steps": [
                         {
-                          "color": "red",
-                          "value": null
+                          "color": "red"
                         },
                         {
                           "color": "yellow",
@@ -3709,7 +3699,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 27
+            "y": 57
           },
           "id": 908,
           "options": {
@@ -3779,16 +3769,16 @@
                   "job": true
                 },
                 "indexByName": {
-                  "cluster": 0,
                   "Value #A": 1,
                   "Value #B": 2,
-                  "Value #C": 3
+                  "Value #C": 3,
+                  "cluster": 0
                 },
                 "renameByName": {
-                  "cluster": "集群",
                   "Value #A": "到期时间",
                   "Value #B": "剩余天数",
-                  "Value #C": "最近采集时间"
+                  "Value #C": "最近采集时间",
+                  "cluster": "集群"
                 }
               }
             }
@@ -3841,8 +3831,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "yellow",
@@ -3862,7 +3851,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 65
           },
           "id": 909,
           "options": {
@@ -3941,8 +3930,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "red",
-                    "value": null
+                    "color": "red"
                   },
                   {
                     "color": "green",
@@ -3958,7 +3946,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 65
           },
           "id": 910,
           "options": {
@@ -3994,11 +3982,769 @@
       ],
       "title": "CockroachDB License 监控",
       "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 1000,
+      "panels": [],
+      "title": "🧭 镜像代理监控 RegistryProxy",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "当前配置并采集到的 registry proxy endpoint 数量",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 14
+      },
+      "id": 1001,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "count(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"resolve\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "代理仓库数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "DNS 解析成功的 registry proxy endpoint 数量",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 14
+      },
+      "id": 1002,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"resolve\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "DNS 正常数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "通过 API 与 manifest 检查的健康 IP 数量",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 14
+      },
+      "id": 1003,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"healthy_ips\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "健康 IP 数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "API 或 manifest 检查失败的 IP 数量",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 14
+      },
+      "id": 1004,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"unhealthy_ips\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "异常 IP 数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "健康 IP 数量占解析 IP 总数的比例",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 14
+      },
+      "id": 1005,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"healthy_ips\"}) / sum(sealos_registry_proxy_health{endpoint=~\"$registry_endpoint\",type=\"ip_count\"}) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "代理健康率",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "当前筛选范围内 /v2/ API 检查的平均响应时间",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 14
+      },
+      "id": 1010,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg(sealos_registry_proxy_response_time_seconds{endpoint=~\"$registry_endpoint\",check_type=\"api\"}) * 1000",
+          "refId": "A"
+        }
+      ],
+      "title": "API 平均耗时",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "当前筛选范围内 manifest 检查的平均响应时间",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 500
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 14
+      },
+      "id": 1006,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "avg(sealos_registry_proxy_response_time_seconds{endpoint=~\"$registry_endpoint\",check_type=\"manifest\"}) * 1000",
+          "refId": "A"
+        }
+      ],
+      "title": "Manifest 平均耗时",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "每个解析 IP 的 API 和 manifest 检查状态、HTTP 状态码、错误类型与响应时间",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "失败"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "成功"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "响应时间(ms)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 1008,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Endpoint"
+          }
+        ]
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sealos_registry_proxy_status{endpoint=~\"$registry_endpoint\"}",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sealos_registry_proxy_response_time_seconds{endpoint=~\"$registry_endpoint\"} * 1000",
+          "format": "table",
+          "instant": true,
+          "refId": "B"
+        }
+      ],
+      "title": "镜像代理 IP 检查详情",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "host": true,
+              "instance": true,
+              "job": true,
+              "port": true,
+              "scheme": true
+            },
+            "indexByName": {
+              "Value #A": 8,
+              "Value #B": 9,
+              "check_type": 5,
+              "endpoint": 0,
+              "error_type": 7,
+              "info": 1,
+              "ip": 4,
+              "reference": 3,
+              "repository": 2,
+              "status_code": 6
+            },
+            "renameByName": {
+              "Value #A": "状态",
+              "Value #B": "响应时间(ms)",
+              "check_type": "检查类型",
+              "endpoint": "Endpoint",
+              "error_type": "错误类型",
+              "info": "信息",
+              "ip": "IP",
+              "reference": "镜像版本",
+              "repository": "镜像仓库",
+              "status_code": "HTTP 状态码"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "registry proxy API 和 manifest 检查响应时间趋势",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 1009,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.3.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sealos_registry_proxy_response_time_seconds{endpoint=~\"$registry_endpoint\"} * 1000",
+          "legendFormat": "{{exported_endpoint}} {{ip}} {{check_type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "镜像代理响应时间趋势",
+      "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "30s",
-  "schemaVersion": 38,
-  "style": "dark",
+  "schemaVersion": 40,
   "tags": [
     "sealos",
     "kubernetes",
@@ -4009,26 +4755,21 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "Prometheus",
-          "value": "Prometheus"
+          "text": "VictoriaMetrics",
+          "value": "145ef98e-a5c6-4abc-a326-43408aab4e8d"
         },
-        "hide": 0,
         "includeAll": false,
         "label": "数据源",
-        "multi": false,
         "name": "DS_PROMETHEUS",
         "options": [],
         "query": "prometheus",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
@@ -4037,7 +4778,6 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(sealos_node_healthy, node)",
-        "hide": 0,
         "includeAll": true,
         "label": "节点",
         "multi": true,
@@ -4049,14 +4789,12 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
@@ -4065,7 +4803,6 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(sealos_database_connectivity, namespace)",
-        "hide": 0,
         "includeAll": true,
         "label": "命名空间",
         "multi": true,
@@ -4077,14 +4814,12 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
@@ -4093,7 +4828,6 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(sealos_database_connectivity, database)",
-        "hide": 0,
         "includeAll": true,
         "label": "数据库",
         "multi": true,
@@ -4105,14 +4839,12 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
@@ -4121,7 +4853,6 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(sealos_database_connectivity, type)",
-        "hide": 0,
         "includeAll": true,
         "label": "数据库类型",
         "multi": true,
@@ -4133,14 +4864,12 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
           "text": "All",
           "value": "$__all"
         },
@@ -4149,7 +4878,6 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "definition": "label_values(sealos_cockroach_license_up, cluster)",
-        "hide": 0,
         "includeAll": true,
         "label": "Cockroach 集群",
         "multi": true,
@@ -4161,7 +4889,31 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(sealos_registry_proxy_health, endpoint)",
+        "includeAll": true,
+        "label": "镜像代理",
+        "multi": true,
+        "name": "registry_endpoint",
+        "options": [],
+        "query": {
+          "query": "label_values(sealos_registry_proxy_health, endpoint)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
         "sort": 1,
         "type": "query"
       }
@@ -4185,6 +4937,6 @@
   "timezone": "",
   "title": "Sealos State Metrics - 完整监控面板",
   "uid": "sealos-state-metrics",
-  "version": 2,
+  "version": 13,
   "weekStart": ""
 }
