@@ -18,7 +18,7 @@ The RegistryProxy collector monitors Docker registry proxy availability by calli
 collectors:
   registryproxy:
     registries:
-      - endpoint: 67.21.84.122:5000
+      - endpoint: 127.0.0.1:5000
         info: public mirror proxy
         scheme: http
         repository: library/busybox
@@ -36,7 +36,7 @@ collectors:
 
 `registries` supports mixed entries:
 
-- String entries such as `67.21.84.122:5000` or `registry-proxy.example.com:5000`
+- String entries such as `127.0.0.1:5000` or `registry-proxy.example.com:5000`
 - Object entries with endpoint metadata and manifest options
 
 ### Configuration Fields
@@ -60,7 +60,7 @@ All configuration can be overridden using environment variables with the prefix 
 
 | Environment Variable | Maps To | Example |
 |---------------------|---------|---------|
-| `COLLECTORS_REGISTRYPROXY_REGISTRIES` | `registries` | `67.21.84.122:5000,registry-proxy.example.com:5000` |
+| `COLLECTORS_REGISTRYPROXY_REGISTRIES` | `registries` | `127.0.0.1:5000,registry-proxy.example.com:5000` |
 | `COLLECTORS_REGISTRYPROXY_CHECK_TIMEOUT` | `checkTimeout` | `10s` |
 | `COLLECTORS_REGISTRYPROXY_CHECK_INTERVAL` | `checkInterval` | `1m` |
 
@@ -132,8 +132,8 @@ The `/v2/` API check treats any response below `500` as available. This keeps un
 Equivalent manual checks:
 
 ```bash
-curl -i http://67.21.84.122:5000/v2/
+curl -i http://127.0.0.1:5000/v2/
 curl -fsSL \
   -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
-  http://67.21.84.122:5000/v2/library/busybox/manifests/latest
+  http://127.0.0.1:5000/v2/library/busybox/manifests/latest
 ```
