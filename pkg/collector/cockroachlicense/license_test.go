@@ -1,7 +1,10 @@
+//nolint:testpackage // Tests exercise private protobuf parser details.
 package cockroachlicense
 
 import (
 	"encoding/base64"
+	"math"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -14,20 +17,71 @@ func TestDecodeLicense(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if info == nil {
 		t.Fatal("expected license info")
 	}
+
 	if got, want := licenseTypeString(info.licenseType), "Trial"; got != want {
 		t.Fatalf("expected type %s, got %s", want, got)
 	}
+
 	if got, want := info.validUntilUnixSec, int64(1781428138); got != want {
 		t.Fatalf("expected expiry %d, got %d", want, got)
 	}
+
 	if got, want := info.licenseID, "00010203-0405-0607-0809-0a0b0c0d0e0f"; got != want {
 		t.Fatalf("expected license id %s, got %s", want, got)
 	}
+
 	if got, want := info.organizationID, "10111213-1415-1617-1819-1a1b1c1d1e1f"; got != want {
 		t.Fatalf("expected organization id %s, got %s", want, got)
+	}
+}
+
+func TestDecodeLicenseRejectsOverflowingVarints(t *testing.T) {
+	tests := []struct {
+		name       string
+		field      protowire.Number
+		value      uint64
+		wantErrSub string
+	}{
+		{
+			name:       "valid until",
+			field:      2,
+			value:      uint64(math.MaxInt64) + 1,
+			wantErrSub: "valid_until field overflow",
+		},
+		{
+			name:       "license type",
+			field:      3,
+			value:      uint64(math.MaxInt32) + 1,
+			wantErrSub: "type field overflow",
+		},
+		{
+			name:       "environment",
+			field:      5,
+			value:      uint64(math.MaxInt32) + 1,
+			wantErrSub: "environment field overflow",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var data []byte
+
+			data = protowire.AppendTag(data, tt.field, protowire.VarintType)
+			data = protowire.AppendVarint(data, tt.value)
+
+			_, err := decodeLicense(licensePrefix + base64.RawStdEncoding.EncodeToString(data))
+			if err == nil {
+				t.Fatal("expected error")
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErrSub) {
+				t.Fatalf("expected error containing %q, got %q", tt.wantErrSub, err.Error())
+			}
+		})
 	}
 }
 
@@ -48,6 +102,7 @@ func encodeTestLicense() string {
 	}
 
 	var data []byte
+
 	data = protowire.AppendTag(data, 2, protowire.VarintType)
 	data = protowire.AppendVarint(data, 1781428138)
 	data = protowire.AppendTag(data, 3, protowire.VarintType)

@@ -2,7 +2,9 @@ package cockroachlicense
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -42,11 +44,13 @@ func decodeLicense(s string) (*licenseInfo, error) {
 	if s == "" {
 		return nil, nil
 	}
+
 	if !strings.HasPrefix(s, licensePrefix) {
-		return nil, fmt.Errorf("invalid license string")
+		return nil, errors.New("invalid license string")
 	}
 
 	payload := strings.TrimPrefix(s, licensePrefix)
+
 	data, err := base64.RawStdEncoding.DecodeString(payload)
 	if err != nil {
 		return nil, fmt.Errorf("invalid license string: %w", err)
@@ -56,49 +60,70 @@ func decodeLicense(s string) (*licenseInfo, error) {
 	for len(data) > 0 {
 		num, typ, n := protowire.ConsumeTag(data)
 		if n < 0 {
-			return nil, fmt.Errorf("invalid license protobuf tag")
+			return nil, errors.New("invalid license protobuf tag")
 		}
+
 		data = data[n:]
 
 		switch num {
 		case 2:
 			if typ != protowire.VarintType {
-				return nil, fmt.Errorf("invalid license valid_until field type")
+				return nil, errors.New("invalid license valid_until field type")
 			}
+
 			v, n := protowire.ConsumeVarint(data)
 			if n < 0 {
-				return nil, fmt.Errorf("invalid license valid_until field")
+				return nil, errors.New("invalid license valid_until field")
 			}
+
+			if v > uint64(math.MaxInt64) {
+				return nil, errors.New("invalid license valid_until field overflow")
+			}
+
 			info.validUntilUnixSec = int64(v)
 			data = data[n:]
 		case 3:
 			if typ != protowire.VarintType {
-				return nil, fmt.Errorf("invalid license type field type")
+				return nil, errors.New("invalid license type field type")
 			}
+
 			v, n := protowire.ConsumeVarint(data)
 			if n < 0 {
-				return nil, fmt.Errorf("invalid license type field")
+				return nil, errors.New("invalid license type field")
 			}
+
+			if v > uint64(math.MaxInt32) {
+				return nil, errors.New("invalid license type field overflow")
+			}
+
 			info.licenseType = licenseType(v)
 			data = data[n:]
 		case 4:
 			if typ != protowire.BytesType {
-				return nil, fmt.Errorf("invalid license organization_name field type")
+				return nil, errors.New("invalid license organization_name field type")
 			}
+
 			v, n := protowire.ConsumeBytes(data)
 			if n < 0 {
-				return nil, fmt.Errorf("invalid license organization_name field")
+				return nil, errors.New("invalid license organization_name field")
 			}
+
 			info.organizationName = string(v)
 			data = data[n:]
 		case 5:
 			if typ != protowire.VarintType {
-				return nil, fmt.Errorf("invalid license environment field type")
+				return nil, errors.New("invalid license environment field type")
 			}
+
 			v, n := protowire.ConsumeVarint(data)
 			if n < 0 {
-				return nil, fmt.Errorf("invalid license environment field")
+				return nil, errors.New("invalid license environment field")
 			}
+
+			if v > uint64(math.MaxInt32) {
+				return nil, errors.New("invalid license environment field overflow")
+			}
+
 			info.environment = licenseEnvironment(v)
 			data = data[n:]
 		case 6:
@@ -106,6 +131,7 @@ func decodeLicense(s string) (*licenseInfo, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			info.licenseID = v
 			data = data[n:]
 		case 7:
@@ -113,6 +139,7 @@ func decodeLicense(s string) (*licenseInfo, error) {
 			if err != nil {
 				return nil, err
 			}
+
 			info.organizationID = v
 			data = data[n:]
 		default:
@@ -120,6 +147,7 @@ func decodeLicense(s string) (*licenseInfo, error) {
 			if n < 0 {
 				return nil, fmt.Errorf("invalid unknown license field %d", num)
 			}
+
 			data = data[n:]
 		}
 	}
@@ -131,16 +159,20 @@ func consumeUUIDBytes(data []byte, typ protowire.Type, field string) (string, in
 	if typ != protowire.BytesType {
 		return "", 0, fmt.Errorf("invalid license %s field type", field)
 	}
+
 	v, n := protowire.ConsumeBytes(data)
 	if n < 0 {
 		return "", 0, fmt.Errorf("invalid license %s field", field)
 	}
+
 	if len(v) == 0 {
 		return "", n, nil
 	}
+
 	if len(v) != 16 {
 		return "", n, fmt.Errorf("invalid license %s length", field)
 	}
+
 	return formatUUID(v), n, nil
 }
 

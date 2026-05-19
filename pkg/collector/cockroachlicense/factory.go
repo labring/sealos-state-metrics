@@ -2,6 +2,7 @@ package cockroachlicense
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/labring/sealos-state-metrics/pkg/collector"
@@ -18,18 +19,23 @@ func init() {
 // NewCollector creates a new Cockroach license collector.
 func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, error) {
 	cfg := NewDefaultConfig()
-	if err := factoryCtx.ConfigLoader.LoadModuleConfig("collectors.cockroachlicense", cfg); err != nil {
+	if err := factoryCtx.ConfigLoader.LoadModuleConfig(
+		"collectors.cockroachlicense",
+		cfg,
+	); err != nil {
 		factoryCtx.Logger.WithError(err).
 			Debug("Failed to load cockroachlicense collector config, using defaults")
 	}
 
 	if len(cfg.Clusters) == 0 {
-		return nil, fmt.Errorf("at least one CockroachDB cluster must be configured")
+		return nil, errors.New("at least one CockroachDB cluster must be configured")
 	}
+
 	for _, cluster := range cfg.Clusters {
 		if cluster.Name == "" {
-			return nil, fmt.Errorf("cockroachlicense cluster name cannot be empty")
+			return nil, errors.New("cockroachlicense cluster name cannot be empty")
 		}
+
 		if cluster.DSN == "" {
 			return nil, fmt.Errorf("cockroachlicense cluster %q DSN cannot be empty", cluster.Name)
 		}
@@ -51,6 +57,7 @@ func NewCollector(factoryCtx *collector.FactoryContext) (collector.Collector, er
 	c.SetLifecycle(base.LifecycleFuncs{
 		StartFunc: func(ctx context.Context) error {
 			go c.pollLoop(ctx)
+
 			c.logger.Info("Cockroach license collector started successfully")
 			return nil
 		},

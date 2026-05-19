@@ -57,7 +57,14 @@ func (c *Collector) initMetrics(namespace string) {
 	c.infoGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "cockroach_license", "info"),
 		"CockroachDB license information. Value is 1 when a license is installed, 0 otherwise.",
-		[]string{"cluster", "type", "environment", "license_id", "organization_id", "organization_name"},
+		[]string{
+			"cluster",
+			"type",
+			"environment",
+			"license_id",
+			"organization_id",
+			"organization_name",
+		},
 		nil,
 	)
 	c.typeGauge = prometheus.NewDesc(
@@ -124,8 +131,10 @@ func (c *Collector) pollLoop(ctx context.Context) {
 func (c *Collector) Poll(ctx context.Context) error {
 	statuses := make(map[string]*ClusterStatus, len(c.config.Clusters))
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
 	for _, cluster := range c.config.Clusters {
 		wg.Add(1)
 		go func(cluster ClusterConfig) {
@@ -138,6 +147,7 @@ func (c *Collector) Poll(ctx context.Context) error {
 			mu.Unlock()
 		}(cluster)
 	}
+
 	wg.Wait()
 
 	c.mu.Lock()
@@ -185,7 +195,7 @@ func (c *Collector) collectCluster(ctx context.Context, cluster ClusterConfig) *
 	status.OrganizationID = info.organizationID
 	status.OrganizationName = info.organizationName
 	status.ExpiresAt = info.validUntilUnixSec
-	status.SecondsUntil = time.Unix(info.validUntilUnixSec, 0).Sub(time.Now()).Seconds()
+	status.SecondsUntil = time.Until(time.Unix(info.validUntilUnixSec, 0)).Seconds()
 
 	return status
 }
@@ -198,7 +208,8 @@ func (c *Collector) queryLicense(ctx context.Context, dsn string) (string, error
 	defer conn.Close(context.Background())
 
 	var license string
-	if err := conn.QueryRow(ctx, "SHOW CLUSTER SETTING enterprise.license").Scan(&license); err != nil {
+	if err := conn.QueryRow(ctx, "SHOW CLUSTER SETTING enterprise.license").
+		Scan(&license); err != nil {
 		return "", err
 	}
 
