@@ -3154,7 +3154,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "最近一次 CockroachDB license 采集成功的目标数量",
+          "description": "当前已安装且未过期的 CockroachDB license 数量",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3210,7 +3210,7 @@
               "refId": "A"
             }
           ],
-          "title": "采集正常数",
+          "title": "License 有效数",
           "type": "stat"
         },
         {
@@ -3218,7 +3218,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "CockroachDB license 采集成功率",
+          "description": "CockroachDB license 有效率，已安装且未过期为有效",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3278,7 +3278,7 @@
               "refId": "A"
             }
           ],
-          "title": "采集成功率",
+          "title": "License 有效率",
           "type": "gauge"
         },
         {
@@ -3900,7 +3900,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "description": "CockroachDB license 采集成功状态，1 表示成功，0 表示失败",
+          "description": "CockroachDB license 有效状态，1 表示已安装且未过期，0 表示未安装、已过期或采集失败",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3988,7 +3988,7 @@
               "refId": "A"
             }
           ],
-          "title": "License 采集状态趋势",
+          "title": "License 有效状态趋势",
           "type": "timeseries"
         }
       ],

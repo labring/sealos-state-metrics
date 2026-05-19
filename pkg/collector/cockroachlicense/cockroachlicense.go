@@ -50,7 +50,7 @@ type Collector struct {
 func (c *Collector) initMetrics(namespace string) {
 	c.upGauge = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "cockroach_license", "up"),
-		"Whether CockroachDB license collection succeeded (1=success, 0=failure)",
+		"Whether CockroachDB license is installed and not expired (1=valid, 0=missing, expired, or collection failure)",
 		[]string{"cluster"},
 		nil,
 	)
@@ -174,6 +174,13 @@ func (c *Collector) collectCluster(ctx context.Context, cluster ClusterConfig) *
 		return status
 	}
 
+	if licenseString == "" {
+		c.logger.Warnf(
+			"No license string returned for cluster %q, treating as no license installed",
+			cluster.Name,
+		)
+	}
+
 	info, err := decodeLicense(licenseString)
 	if err != nil {
 		status.Error = err.Error()
@@ -182,7 +189,6 @@ func (c *Collector) collectCluster(ctx context.Context, cluster ClusterConfig) *
 		return status
 	}
 
-	status.Up = true
 	if info == nil {
 		return status
 	}
@@ -196,6 +202,7 @@ func (c *Collector) collectCluster(ctx context.Context, cluster ClusterConfig) *
 	status.OrganizationName = info.organizationName
 	status.ExpiresAt = info.validUntilUnixSec
 	status.SecondsUntil = time.Until(time.Unix(info.validUntilUnixSec, 0)).Seconds()
+	status.Up = status.SecondsUntil > 0
 
 	return status
 }
