@@ -70,9 +70,10 @@ performance:
   informerResyncPeriod: "10m"
 
 # List of enabled collectors
-# Available collectors: domain, node, pod, imagepull, zombie, cloudbalance, database
+# Available collectors: domain, registryproxy, node, pod, imagepull, zombie, cloudbalance, database
 enabledCollectors:
   - domain
+  # - registryproxy  # Disabled by default
   - node
   - pod
   - imagepull
@@ -147,6 +148,27 @@ collectors:
     includeCertCheck: true
     # Include HTTP connectivity check
     includeHTTPCheck: true
+
+  # RegistryProxy collector - monitors Docker registry proxy availability
+  registryproxy:
+    # Registry proxy endpoints to monitor.
+    # Supports string entries and object entries with per-registry metadata.
+    registries:
+      - endpoint: 67.21.84.122:5000
+        info: "public mirror proxy"
+        scheme: http
+        repository: library/busybox
+        reference: latest
+        manifestAcceptHeader: application/vnd.docker.distribution.manifest.v2+json
+      - endpoint: registry-proxy.example.com:5000
+        info: "internal proxy"
+        scheme: http
+        headers:
+          X-Probe: sealos-state-metrics
+    # Check timeout for each registry proxy endpoint
+    checkTimeout: "30s"
+    # Check interval (how often to check all registry proxies)
+    checkInterval: "1m"
 
   # Node collector - monitors Kubernetes node conditions
   node:

@@ -127,9 +127,10 @@ leaderElection:
   retryPeriod: "2s"
 
 # Enabled collectors
-# Examples: [domain, node, imagepull, zombie, cloudbalance, lvm, database, crd]
+# Examples: [domain, registryproxy, node, imagepull, zombie, cloudbalance, lvm, database, crd]
 enabledCollectors:
   - domain
+  # - registryproxy
   - node
   - imagepull
   - zombie
@@ -165,6 +166,19 @@ collectors:
     includeIPv6: true
     includeCertCheck: true
     includeHTTPCheck: true
+
+  registryproxy:
+    # Example:
+    # registries:
+    #   - endpoint: 67.21.84.122:5000
+    #     info: public mirror proxy
+    #     scheme: http
+    #     repository: library/busybox
+    #     reference: latest
+    #     manifestAcceptHeader: application/vnd.docker.distribution.manifest.v2+json
+    registries: []
+    checkTimeout: "30s"
+    checkInterval: "1m"
 
   node: {}
 
