@@ -413,6 +413,7 @@ collectors:
 `)
 
 	cfg := NewDefaultConfig()
+
 	loader := config.NewModuleConfigLoader(
 		yamlContent,
 		config.WithModuleDecodeHook(mapstructure.StringToTimeDurationHookFunc()),

@@ -14,10 +14,11 @@ import (
 	"time"
 )
 
-func TestCheckHTTPWithIPAndOptions_FollowRedirectsFallsBackToDefaultDialForDifferentHost(t *testing.T) {
+func TestCheckHTTPWithIPAndOptions_FollowRedirectsFallsBackToDefaultDialForDifferentHost(
+	t *testing.T,
+) {
 	redirectTarget := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		}),
@@ -33,7 +34,6 @@ func TestCheckHTTPWithIPAndOptions_FollowRedirectsFallsBackToDefaultDialForDiffe
 
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 		}),
@@ -76,7 +76,6 @@ func TestCheckHTTPWithIPAndOptions_FollowRedirectsFallsBackToDefaultDialForDiffe
 func TestCheckHTTPWithIPAndOptions_CanDisableRedirectFollowing(t *testing.T) {
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "https://localhost/next", http.StatusFound)
 		}),
@@ -165,7 +164,6 @@ func TestCheckHTTPWithIPAndOptions_RetriesTLSHandshakeFailure(t *testing.T) {
 func TestCheckHTTPWithIPAndOptions_UsesRequestOptions(t *testing.T) {
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
 				t.Errorf("request method = %q, want %q", r.Method, http.MethodPost)
@@ -218,7 +216,6 @@ func TestCheckHTTPWithIPAndOptions_UsesRequestOptions(t *testing.T) {
 func TestCheckHTTPWithIPAndOptions_RejectsUnexpectedStatusCode(t *testing.T) {
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		}),
@@ -259,9 +256,9 @@ func TestCheckHTTPWithIPAndOptions_DoesNotWaitForResponseBody(t *testing.T) {
 
 	origin := newLocalTLSServerOnAddr(
 		t,
-		"127.0.0.1:0",
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
+
 			if flusher, ok := w.(http.Flusher); ok {
 				flusher.Flush()
 			}
@@ -382,12 +379,12 @@ func TestRetryHTTPDialContext_NormalizesInvalidRetries(t *testing.T) {
 	}
 }
 
-func newLocalTLSServerOnAddr(t *testing.T, addr string, handler http.Handler) *httptest.Server {
+func newLocalTLSServerOnAddr(t *testing.T, handler http.Handler) *httptest.Server {
 	t.Helper()
 
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("failed to listen on %q: %v", addr, err)
+		t.Fatalf("failed to listen on loopback: %v", err)
 	}
 
 	server := httptest.NewUnstartedServer(handler)

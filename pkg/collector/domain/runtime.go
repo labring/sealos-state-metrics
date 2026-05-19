@@ -200,7 +200,10 @@ func normalizeExpectedStatusCodes(statusCodes []int) ([]int, error) {
 
 	for _, statusCode := range statusCodes {
 		if statusCode < 100 || statusCode > 599 {
-			return nil, fmt.Errorf("invalid expected HTTP status code %d: must be between 100 and 599", statusCode)
+			return nil, fmt.Errorf(
+				"invalid expected HTTP status code %d: must be between 100 and 599",
+				statusCode,
+			)
 		}
 
 		if _, ok := seen[statusCode]; ok {

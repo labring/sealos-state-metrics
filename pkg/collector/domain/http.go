@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -126,6 +127,7 @@ func checkHTTPWithIPAndOptions(
 	}
 
 	resp, err := client.Do(req)
+
 	responseTime := time.Since(start)
 	if err != nil {
 		return &httpCheckResult{
@@ -222,13 +224,7 @@ func isExpectedHTTPStatus(statusCode int, expected []int) bool {
 		return statusCode >= 200 && statusCode < 500
 	}
 
-	for _, code := range expected {
-		if statusCode == code {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(expected, statusCode)
 }
 
 func validateHTTPMonitoringTarget(host string, port int, ip string) error {
